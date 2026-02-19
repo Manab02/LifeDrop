@@ -1,0 +1,146 @@
+[
+  {
+    "state": "Andhra Pradesh",
+    "is_union_territory": "No"
+  },
+  {
+    "state": "Arunachal Pradesh",
+    "is_union_territory": "No"
+  },
+  {
+    "state": "Assam",
+    "is_union_territory": "No"
+  },
+  {
+    "state": "Bihar",
+    "is_union_territory": "No"
+  },
+  {
+    "state": "Chhattisgarh",
+    "is_union_territory": "No"
+  },
+  {
+    "state": "Goa",
+    "is_union_territory": "No"
+  },
+  {
+    "state": "Gujarat",
+    "is_union_territory": "No"
+  },
+  {
+    "state": "Haryana",
+    "is_union_territory": "No"
+  },
+  {
+    "state": "Himachal Pradesh",
+    "is_union_territory": "No"
+  },
+  {
+    "state": "Jharkhand",
+    "is_union_territory": "No"
+  },
+  {
+    "state": "Karnataka",
+    "is_union_territory": "No"
+  },
+  {
+    "state": "Kerala",
+    "is_union_territory": "No"
+  },
+  {
+    "state": "Madhya Pradesh",
+    "is_union_territory": "No"
+  },
+  {
+    "state": "Maharashtra",
+    "is_union_territory": "No"
+  },
+  {
+    "state": "Manipur",
+    "is_union_territory": "No"
+  },
+  {
+    "state": "Meghalaya",
+    "is_union_territory": "No"
+  },
+  {
+    "state": "Mizoram",
+    "is_union_territory": "No"
+  },
+  {
+    "state": "Nagaland",
+    "is_union_territory": "No"
+  },
+  {
+    "state": "Odisha",
+    "is_union_territory": "No"
+  },
+  {
+    "state": "Punjab",
+    "is_union_territory": "No"
+  },
+  {
+    "state": "Rajasthan",
+    "is_union_territory": "No"
+  },
+  {
+    "state": "Sikkim",
+    "is_union_territory": "No"
+  },
+  {
+    "state": "Tamil Nadu",
+    "is_union_territory": "No"
+  },
+  {
+    "state": "Telangana",
+    "is_union_territory": "No"
+  },
+  {
+    "state": "Tripura",
+    "is_union_territory": "No"
+  },
+  {
+    "state": "Uttar Pradesh",
+    "is_union_territory": "No"
+  },
+  {
+    "state": "Uttarakhand",
+    "is_union_territory": "No"
+  },
+  {
+    "state": "West Bengal",
+    "is_union_territory": "No"
+  },
+  {
+    "state": "Andaman and Nicobar Islands",
+    "is_union_territory": "Yes"
+  },
+  {
+    "state": "Chandigarh",
+    "is_union_territory": "Yes"
+  },
+  {
+    "state": "Dadra and Nagar Haveli and Daman and Diu",
+    "is_union_territory": "Yes"
+  },
+  {
+    "state": "Delhi",
+    "is_union_territory": "Yes"
+  },
+  {
+    "state": "Jammu and Kashmir",
+    "is_union_territory": "Yes"
+  },
+  {
+    "state": "Ladakh",
+    "is_union_territory": "Yes"
+  },
+  {
+    "state": "Lakshadweep",
+    "is_union_territory": "Yes"
+  },
+  {
+    "state": "Puducherry",
+    "is_union_territory": "Yes"
+  }
+]

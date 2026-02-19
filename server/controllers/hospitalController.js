@@ -1,0 +1,110 @@
+import userModel from "../models/userModels.js";
+import inventoryModels from "../models/inventoryModels.js";
+
+// GET hospital profile
+export const getHospitalProfile = async (req, res) => {
+    try {
+        const hospital = await userModel.findById(req.body.userId).select('-password');
+
+        if (!hospital || hospital.role !== 'hospital') {
+            return res.json({ success: false, message: 'Hospital not found' });
+        }
+
+        return res.json({
+            success: true,
+            hospital: hospital
+        });
+    } catch (error) {
+        return res.json({ success: false, message: error.message });
+    }
+};
+
+// UPDATE hospital profile
+export const updateHospitalProfile = async (req, res) => {
+    try {
+        const { hospitalName, phone, email, state, district, city } = req.body;
+
+        const hospital = await userModel.findById(req.body.userId);
+
+        if (!hospital || hospital.role !== 'hospital') {
+            return res.json({ success: false, message: 'Hospital not found' });
+        }
+
+        // Only allow updates if approved
+        if (!hospital.isAccountVerified) {
+            return res.json({
+                success: false,
+                message: 'Your account is pending admin approval. You cannot edit details yet.'
+            });
+        }
+
+        // Update fields
+        if (hospitalName) hospital.hospitalName = hospitalName;
+        if (phone) hospital.phone = phone;
+        if (email) hospital.email = email;
+        if (state || district || city) {
+            hospital.address = {
+                state: state || hospital.address?.state,
+                district: district || hospital.address?.district,
+                city: city || hospital.address?.city
+            };
+        }
+
+        await hospital.save();
+
+        return res.json({
+            success: true,
+            message: 'Profile updated successfully',
+            hospital: hospital
+        });
+    } catch (error) {
+        return res.json({ success: false, message: error.message });
+    }
+};
+
+// GET blood stock for hospital
+export const getBloodStock = async (req, res) => {
+    try {
+        const hospital = await userModel.findById(req.body.userId);
+
+        if (!hospital || hospital.role !== 'hospital') {
+            return res.json({ success: false, message: 'Hospital not found' });
+        }
+
+        if (!hospital.isAccountVerified) {
+            return res.json({
+                success: false,
+                message: 'Your account is pending admin approval.'
+            });
+        }
+
+        // Get all inventory for this hospital
+        const inventory = await inventoryModels.find({
+            hospital: req.body.userId
+        }).populate('donor').populate('organisation');
+
+        // Calculate stock per blood group
+        const bloodStock = {};
+        const bloodGroups = ['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'];
+
+        bloodGroups.forEach(group => {
+            bloodStock[group] = 0;
+        });
+
+        inventory.forEach(item => {
+            if (item.inventoryType === 'in') {
+                bloodStock[item.bloodGroup] += item.quantity;
+            } else if (item.inventoryType === 'out') {
+                bloodStock[item.bloodGroup] -= item.quantity;
+            }
+        });
+
+        return res.json({
+            success: true,
+            bloodStock: bloodStock,
+            inventory: inventory
+        });
+    } catch (error) {
+        return res.json({ success: false, message: error.message });
+    }
+};
