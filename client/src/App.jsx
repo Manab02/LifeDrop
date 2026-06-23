@@ -7,6 +7,9 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import EmailVerify from './pages/EmailVerify';
 import ResetPassword from './pages/ResetPassword';
+import NotFound from './pages/NotFound';
+import CompleteProfile from './pages/CompleteProfile';
+import ProtectedRoute from './components/ProtectedRoute';
 
 // Dashboard imports
 import AdminDashboard from './pages/AdminDashboard';
@@ -28,12 +31,13 @@ function App() {
         <Route path="/email-verify" element={<EmailVerify />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/search" element={<Search />} />
+        <Route path="/complete-profile" element={<CompleteProfile />} />
 
-        {/* Dashboard Routes (Role-based) */}
-        <Route path="/admin-dashboard" element={<AdminDashboard />} />
-        <Route path="/donor-dashboard" element={<DonorDashboard />} />
-        <Route path="/hospital-dashboard" element={<HospitalDashboard />} />
-        <Route path="/organisation-dashboard" element={<OrganisationDashboard />} />
+        <Route path="/admin-dashboard" element={<ProtectedRoute element={<AdminDashboard />} role="admin" />} />
+        <Route path="/donor-dashboard" element={<ProtectedRoute element={<DonorDashboard />} role="donor" />} />
+        <Route path="/hospital-dashboard" element={<ProtectedRoute element={<HospitalDashboard />} role="hospital" />} />
+        <Route path="/organisation-dashboard" element={<ProtectedRoute element={<OrganisationDashboard />} role="organisation" />} />
+        <Route path="*" element={<NotFound />} />
       </Routes>
     </Router>
   );

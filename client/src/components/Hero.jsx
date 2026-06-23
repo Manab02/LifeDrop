@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-
 const Hero = () => {
     const navigate = useNavigate();
     const [states, setStates] = useState([]);
@@ -71,13 +70,11 @@ const Hero = () => {
             return;
         }
 
-        // For donors, blood group is required
         if (searchType === 'donor' && !bloodGroup) {
             alert('Please select blood group for donor search');
             return;
         }
 
-        // Build search params
         const params = new URLSearchParams({
             type: searchType,
             state: selectedState,
@@ -85,19 +82,16 @@ const Hero = () => {
             city: selectedCity
         });
 
-        // Add blood group if selected
         if (bloodGroup) {
             params.append('bloodGroup', bloodGroup);
         }
 
-        // Navigate to unified search page
         navigate(`/search?${params.toString()}`);
     };
 
     return (
         <section className="text-center py-24 px-4 bg-gradient-to-r from-red-700 via-red-500 to-red-300 relative overflow-hidden">
             <div className="relative z-10 flex flex-col items-center justify-center space-y-6">
-                {/* Title + Image */}
                 <div className="flex flex-col md:flex-row items-center justify-center space-y-6 md:space-y-0 md:space-x-6">
                     <h2 className="text-4xl md:text-5xl font-extrabold text-white">
                         FIND BLOOD RESOURCES

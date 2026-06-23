@@ -5,7 +5,7 @@ import { authAPI } from '../services/api';
 
 const ResetPassword = () => {
     const navigate = useNavigate();
-    const [step, setStep] = useState(1); // 1: Email, 2: OTP & Password
+    const [step, setStep] = useState(1);                // 1: Email, 2: OTP & Password
     const [email, setEmail] = useState('');
     const [otp, setOtp] = useState(['', '', '', '', '', '']);
     const [newPassword, setNewPassword] = useState('');
@@ -175,7 +175,6 @@ const ResetPassword = () => {
                 ) : (
                     // Step 2: OTP & New Password
                     <form onSubmit={handleResetPassword}>
-                        {/* OTP Input */}
                         <div className="mb-6">
                             <label className="block text-sm font-semibold text-gray-700 mb-3 text-center">
                                 Enter 6-Digit OTP

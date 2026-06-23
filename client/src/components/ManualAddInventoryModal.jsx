@@ -19,7 +19,6 @@ const ManualAddInventoryModal = ({ show, onClose, onSuccess, userRole, userEmail
 
     useEffect(() => {
         if (show) {
-            // Auto-set inventory type based on role
             let defaultType = '';
             if (userRole === 'donor') defaultType = 'in';
             else if (userRole === 'hospital') defaultType = 'out';
@@ -56,14 +55,12 @@ const ManualAddInventoryModal = ({ show, onClose, onSuccess, userRole, userEmail
             return;
         }
 
-        //  Validate expiry date 
         const expiryDateObj = new Date(formData.expiryDate);
         if (expiryDateObj <= new Date()) {
             alert('Expiry date must be in the future');
             return;
         }
 
-        // Validate inventory type specific fields
         if (formData.inventoryType === 'in' && !formData.donorEmail && !formData.organisationEmail) {
             alert('Please provide donor email or organisation email for IN type');
             return;

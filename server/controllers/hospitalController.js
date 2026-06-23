@@ -1,7 +1,6 @@
 import userModel from "../models/userModels.js";
 import inventoryModels from "../models/inventoryModels.js";
 
-// GET hospital profile
 export const getHospitalProfile = async (req, res) => {
     try {
         const hospital = await userModel.findById(req.body.userId).select('-password');
@@ -19,7 +18,6 @@ export const getHospitalProfile = async (req, res) => {
     }
 };
 
-// UPDATE hospital profile
 export const updateHospitalProfile = async (req, res) => {
     try {
         const { hospitalName, phone, email, state, district, city } = req.body;
@@ -30,7 +28,6 @@ export const updateHospitalProfile = async (req, res) => {
             return res.json({ success: false, message: 'Hospital not found' });
         }
 
-        // Only allow updates if approved
         if (!hospital.isAccountVerified) {
             return res.json({
                 success: false,
@@ -38,7 +35,6 @@ export const updateHospitalProfile = async (req, res) => {
             });
         }
 
-        // Update fields
         if (hospitalName) hospital.hospitalName = hospitalName;
         if (phone) hospital.phone = phone;
         if (email) hospital.email = email;
@@ -62,7 +58,6 @@ export const updateHospitalProfile = async (req, res) => {
     }
 };
 
-// GET blood stock for hospital
 export const getBloodStock = async (req, res) => {
     try {
         const hospital = await userModel.findById(req.body.userId);
@@ -78,12 +73,10 @@ export const getBloodStock = async (req, res) => {
             });
         }
 
-        // Get all inventory for this hospital
         const inventory = await inventoryModels.find({
             hospital: req.body.userId
         }).populate('donor').populate('organisation');
 
-        // Calculate stock per blood group
         const bloodStock = {};
         const bloodGroups = ['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'];
 

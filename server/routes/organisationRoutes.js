@@ -4,13 +4,10 @@ import { getOrganisationProfile, updateOrganisationProfile, getOrganisationBlood
 
 const router = express.Router();
 
-// GET organisation profile
 router.get('/profile', userAuth, getOrganisationProfile);
 
-// UPDATE organisation profile
 router.put('/profile', userAuth, updateOrganisationProfile);
 
-// GET blood stock
 router.get('/blood-stock', userAuth, getOrganisationBloodStock);
 
 export default router;

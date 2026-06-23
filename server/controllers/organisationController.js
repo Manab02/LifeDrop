@@ -1,7 +1,6 @@
 import userModel from "../models/userModels.js";
-import inventoryModels from "../models/inventoryModels.js";
+import inventoryModels from "../models/inventoryModels.js"
 
-// GET organisation profile
 export const getOrganisationProfile = async (req, res) => {
     try {
         const organisation = await userModel.findById(req.body.userId).select('-password');
@@ -19,7 +18,6 @@ export const getOrganisationProfile = async (req, res) => {
     }
 };
 
-// UPDATE organisation profile
 export const updateOrganisationProfile = async (req, res) => {
     try {
         const { organisationName, phone, email, state, district, city } = req.body;
@@ -30,7 +28,7 @@ export const updateOrganisationProfile = async (req, res) => {
             return res.json({ success: false, message: 'Organisation not found' });
         }
 
-        // Only allow updates if approved
+        
         if (!organisation.isAccountVerified) {
             return res.json({
                 success: false,
@@ -38,7 +36,7 @@ export const updateOrganisationProfile = async (req, res) => {
             });
         }
 
-        // Update fields
+        
         if (organisationName) organisation.organisationName = organisationName;
         if (phone) organisation.phone = phone;
         if (email) organisation.email = email;
@@ -78,12 +76,12 @@ export const getOrganisationBloodStock = async (req, res) => {
             });
         }
 
-        // Get all inventory managed by this organisation
+        
         const inventory = await inventoryModels.find({
             organisation: req.body.userId
         }).populate('donor').populate('hospital');
 
-        // Calculate stock per blood group
+        
         const bloodStock = {};
         const bloodGroups = ['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'];
 

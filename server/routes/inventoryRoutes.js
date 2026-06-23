@@ -14,7 +14,6 @@ import userAuth from "../middleware/userAuth.js";
 
 const router = express.Router();
 
-// Existing routes
 router.post('/create-inventory', userAuth, createInventory);
 router.get('/get-inventory', userAuth, getInventoryController);
 router.get('/blood-stock', userAuth, getBloodStock);
@@ -24,6 +23,6 @@ router.put('/update-inventory/:id', userAuth, updateInventory);
 router.post('/decrease-inventory', userAuth, decreaseInventory);
 router.post('/approve-transaction/:transactionId', userAuth, approveTransaction);
 router.post('/reject-transaction/:transactionId', userAuth, rejectTransaction);
-router.get('/expiry-notifications', userAuth, getExpiryNotifications);
+router.post('/expiry-notifications', userAuth, getExpiryNotifications);
 
 export default router;

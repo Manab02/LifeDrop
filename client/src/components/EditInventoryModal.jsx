@@ -35,7 +35,6 @@ const EditInventoryModal = ({ show, onClose, onSuccess, inventoryRecord }) => {
             return;
         }
 
-        // Validate expiry date is in future
         const expiryDateObj = new Date(formData.expiryDate);
         if (expiryDateObj <= new Date()) {
             alert('Expiry date must be in the future');
@@ -87,7 +86,6 @@ const EditInventoryModal = ({ show, onClose, onSuccess, inventoryRecord }) => {
 
                 {/* Form */}
                 <form onSubmit={handleSubmit} className="p-6 space-y-4">
-                    {/* Record Info */}
                     {inventoryRecord && (
                         <div className="bg-gray-50 rounded-lg p-3 text-sm">
                             <p className="text-gray-600">

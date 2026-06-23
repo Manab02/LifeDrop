@@ -8,7 +8,7 @@ const AdminDashboard = () => {
   const [user, setUser] = useState(null);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [loading, setLoading] = useState(true);
-  const [showIDs, setShowIDs] = useState(false); // Toggle for System IDs
+  const [showIDs, setShowIDs] = useState(false);
 
   // Modals
   const [showDocModal, setShowDocModal] = useState(false);

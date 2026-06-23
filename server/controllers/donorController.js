@@ -1,6 +1,5 @@
 import userModel from "../models/userModels.js";
 
-// GET donor profile
 export const getDonorProfile = async (req, res) => {
     try {
         const donor = await userModel.findById(req.body.userId).select('-password');
@@ -18,7 +17,6 @@ export const getDonorProfile = async (req, res) => {
     }
 };
 
-// UPDATE donor profile
 export const updateDonorProfile = async (req, res) => {
     try {
         const { name, phone, bloodtype, age, state, district, city, isAvailable } = req.body;
@@ -29,7 +27,6 @@ export const updateDonorProfile = async (req, res) => {
             return res.json({ success: false, message: 'Donor not found' });
         }
 
-        // Update fields
         if (name) donor.name = name;
         if (phone) donor.phone = phone;
         if (bloodtype) donor.bloodtype = bloodtype;
@@ -57,7 +54,6 @@ export const updateDonorProfile = async (req, res) => {
     }
 };
 
-// Toggle availability
 export const toggleAvailability = async (req, res) => {
     try {
         const donor = await userModel.findById(req.body.userId);

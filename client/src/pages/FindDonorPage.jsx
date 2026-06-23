@@ -45,7 +45,6 @@ const FindDonor = () => {
             .catch(err => console.error('Error loading cities:', err));
     }, []);
 
-    // READ URL PARAMS ON MOUNT
     useEffect(() => {
         const urlBloodGroup = searchParams.get('bloodGroup');
         const urlState = searchParams.get('state');
@@ -57,15 +56,12 @@ const FindDonor = () => {
             setSelectedState(urlState);
             setSelectedDistrict(urlDistrict);
             setSelectedCity(urlCity);
-
-            // Auto-search when params present
             setTimeout(() => {
                 handleSearch(urlBloodGroup, urlState, urlDistrict, urlCity);
             }, 500);
         }
     }, [searchParams]);
 
-    // Update districts when state changes
     useEffect(() => {
         if (selectedState) {
             const districts = districtsData.filter(d => d.state_name === selectedState);

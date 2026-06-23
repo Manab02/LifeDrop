@@ -16,8 +16,6 @@ const DonorDashboard = () => {
     const [loading, setLoading] = useState(true);
     const [isAvailable, setIsAvailable] = useState(true);
     const [toggleLoading, setToggleLoading] = useState(false);
-
-    // Profile Edit States
     const [editMode, setEditMode] = useState(false);
     const [profileData, setProfileData] = useState({
         name: '',
@@ -31,8 +29,6 @@ const DonorDashboard = () => {
     const [districts, setDistricts] = useState([]);
     const [cities, setCities] = useState([]);
     const [profileLoading, setProfileLoading] = useState(false);
-
-    // Add Donation Modal States
     const [showAddDonationModal, setShowAddDonationModal] = useState(false);
     const [donationFormData, setDonationFormData] = useState({
         quantity: '',
@@ -41,8 +37,6 @@ const DonorDashboard = () => {
         organisationEmail: ''
     });
     const [donationLoading, setDonationLoading] = useState(false);
-
-    // Hospitals and Organizations Lists
     const [hospitals, setHospitals] = useState([]);
     const [organisations, setOrganisations] = useState([]);
     const [hospitalsLoading, setHospitalsLoading] = useState(false);
@@ -50,6 +44,18 @@ const DonorDashboard = () => {
 
     useEffect(() => {
         checkAuth();
+    }, []);
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const userParam = params.get('user');
+        if (userParam) {
+            try {
+                const user = JSON.parse(decodeURIComponent(userParam));
+                localStorage.setItem('user', JSON.stringify(user));
+                // Clean the URL
+                window.history.replaceState({}, '', '/donor-dashboard');
+            } catch (e) { console.error('Failed to parse user param'); }
+        }
     }, []);
 
     useEffect(() => {
@@ -944,7 +950,7 @@ const DonorDashboard = () => {
                                         setDonationFormData({
                                             ...donationFormData,
                                             hospitalEmail: e.target.value,
-                                            organisationEmail: '' // Clear organisation if hospital is selected
+                                            organisationEmail: '' 
                                         });
                                     }}
                                     disabled={hospitalsLoading}
@@ -965,7 +971,6 @@ const DonorDashboard = () => {
                                 )}
                             </div>
 
-                            {/* OR Divider */}
                             <div className="flex items-center justify-center">
                                 <div className="border-t border-gray-300 flex-1"></div>
                                 <span className="px-4 text-gray-500 font-semibold">OR</span>
@@ -983,7 +988,7 @@ const DonorDashboard = () => {
                                         setDonationFormData({
                                             ...donationFormData,
                                             organisationEmail: e.target.value,
-                                            hospitalEmail: '' // Clear hospital if organisation is selected
+                                            hospitalEmail: '' 
                                         });
                                     }}
                                     disabled={orgsLoading}
@@ -992,7 +997,7 @@ const DonorDashboard = () => {
                                     <option value="">-- Select Organisation --</option>
                                     {organisations.map((org) => (
                                         <option key={org._id} value={org.email}>
-                                            {org.organisationName} ({org.systemId})
+                                            {org.organisationName}
                                         </option>
                                     ))}
                                 </select>

@@ -20,8 +20,6 @@ const OrganisationDashboard = () => {
     const [showManualAddModal, setShowManualAddModal] = useState(false);
     const [showEditModal, setShowEditModal] = useState(false);
     const [selectedInventory, setSelectedInventory] = useState(null);
-
-    // Expiry warnings and blood stock tracking
     const [expiryWarnings, setExpiryWarnings] = useState([]);
     const [bloodStock, setBloodStock] = useState({});
 
@@ -52,10 +50,9 @@ const OrganisationDashboard = () => {
                 calculateBloodStock(data.inventory);
             }
 
-            // Fetch expiry warnings
             try {
                 const expiryResponse = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:7000'}/api/inventory/expiry-notifications`, {
-                    method: 'GET',
+                    method: 'POST',
                     credentials: 'include',
                     headers: { 'Content-Type': 'application/json' }
                 });
@@ -80,7 +77,6 @@ const OrganisationDashboard = () => {
         });
 
         inventoryData.forEach(item => {
-            // Only count non-expired items
             if (item.status !== 'expired' && new Date(item.expiryDate) > new Date()) {
                 if (item.inventoryType === 'in') {
                     stock[item.bloodGroup] = (stock[item.bloodGroup] || 0) + item.quantity;
@@ -105,7 +101,7 @@ const OrganisationDashboard = () => {
         });
 
         setStats({
-            totalCamps: 48,
+            totalCamps: inventory.length > 0 ? Math.floor(inventory.length / 3) : 0,
             totalDonors: donors.size,
             bloodUnits: totalUnits,
             partnerHospitals: hospitals.size
@@ -233,9 +229,9 @@ const OrganisationDashboard = () => {
                                     <div className="text-xs text-gray-600 mt-1">units</div>
                                     <div className="mt-2">
                                         <span className={`text-xs font-semibold px-2 py-1 rounded ${quantity > 50 ? 'bg-green-100 text-green-700' :
-                                                quantity > 20 ? 'bg-yellow-100 text-yellow-700' :
-                                                    quantity > 0 ? 'bg-orange-100 text-orange-700' :
-                                                        'bg-red-100 text-red-700'
+                                            quantity > 20 ? 'bg-yellow-100 text-yellow-700' :
+                                                quantity > 0 ? 'bg-orange-100 text-orange-700' :
+                                                    'bg-red-100 text-red-700'
                                             }`}>
                                             {quantity > 50 ? 'Good' : quantity > 20 ? 'Low' : quantity > 0 ? 'Critical' : 'Out'}
                                         </span>
@@ -319,45 +315,13 @@ const OrganisationDashboard = () => {
                 {/* Upcoming Blood Camps */}
                 <div className="mb-8">
                     <h2 className="text-lg font-semibold mb-3 text-gray-700">Upcoming Blood Donation Camps</h2>
-                    <div className="overflow-x-auto bg-white rounded-lg shadow">
-                        <table className="w-full text-left border-collapse">
-                            <thead className="bg-gray-200">
-                                <tr>
-                                    <th className="p-3">Camp ID</th>
-                                    <th className="p-3">Camp Name</th>
-                                    <th className="p-3">Location</th>
-                                    <th className="p-3">Date</th>
-                                    <th className="p-3">Volunteers</th>
-                                    <th className="p-3">Action</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr className="border-b">
-                                    <td className="p-3">CAMP101</td>
-                                    <td className="p-3">Health Awareness Drive</td>
-                                    <td className="p-3">Kolkata</td>
-                                    <td className="p-3">2025-10-20</td>
-                                    <td className="p-3">25</td>
-                                    <td className="p-3">
-                                        <button className="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-500">Details</button>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td className="p-3">CAMP102</td>
-                                    <td className="p-3">Youth Blood Camp</td>
-                                    <td className="p-3">Bhubaneswar</td>
-                                    <td className="p-3">2025-10-28</td>
-                                    <td className="p-3">30</td>
-                                    <td className="p-3">
-                                        <button className="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-500">Details</button>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
+                    <div className="bg-white rounded-lg shadow p-8 text-center text-gray-500">
+                        <i className="fa fa-calendar-plus text-4xl text-gray-300 mb-3"></i>
+                        <p className="text-lg font-semibold">No upcoming camps scheduled</p>
+                        <p className="text-sm mt-1">Click "Organize Camp" to schedule a new blood donation camp.</p>
                     </div>
                 </div>
 
-                {/* Recent Donation Records */}
                 <div className="mb-8">
                     <h2 className="text-lg font-semibold mb-3 text-gray-700">Recent Donation Records</h2>
                     <div className="overflow-x-auto bg-white rounded-lg shadow">
@@ -414,10 +378,10 @@ const OrganisationDashboard = () => {
                                             <td className="p-3">{new Date(item.createdAt).toLocaleDateString()}</td>
                                             <td className="p-3">
                                                 <span className={`px-2 py-1 rounded text-xs font-semibold ${item.status === 'expired' ? 'bg-red-100 text-red-700' :
-                                                        item.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
-                                                            item.status === 'approved' ? 'bg-blue-100 text-blue-700' :
-                                                                item.status === 'rejected' ? 'bg-gray-100 text-gray-700' :
-                                                                    'bg-green-100 text-green-700'
+                                                    item.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
+                                                        item.status === 'approved' ? 'bg-blue-100 text-blue-700' :
+                                                            item.status === 'rejected' ? 'bg-gray-100 text-gray-700' :
+                                                                'bg-green-100 text-green-700'
                                                     }`}>
                                                     {item.status || 'Completed'}
                                                 </span>
@@ -447,7 +411,6 @@ const OrganisationDashboard = () => {
                     </div>
                 </div>
 
-                {/* Notifications */}
                 <div>
                     <h2 className="text-lg font-semibold mb-3 text-gray-700">Notifications</h2>
                     <div className="bg-white p-4 rounded-lg shadow space-y-3">
@@ -462,7 +425,6 @@ const OrganisationDashboard = () => {
                     </div>
                 </div>
 
-                {/* Record Donation Modal (Quick) */}
                 <RecordDonationModal
                     show={showRecordModal}
                     onClose={() => setShowRecordModal(false)}
@@ -470,7 +432,6 @@ const OrganisationDashboard = () => {
                     organisationEmail={user?.email}
                 />
 
-                {/* Manual Add Record Modal (Both IN/OUT) */}
                 <ManualAddInventoryModal
                     show={showManualAddModal}
                     onClose={() => setShowManualAddModal(false)}
@@ -478,8 +439,6 @@ const OrganisationDashboard = () => {
                     userRole="organisation"
                     userEmail={user?.email}
                 />
-
-                {/* Edit Record Modal */}
                 <EditInventoryModal
                     show={showEditModal}
                     onClose={() => setShowEditModal(false)}
@@ -488,7 +447,6 @@ const OrganisationDashboard = () => {
                 />
             </main>
 
-            {/* Font Awesome */}
             <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
         </div>
     );

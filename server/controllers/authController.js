@@ -9,13 +9,12 @@ export const register = async (req, res) => {
 
     const { email, password, role, name, organisationName, hospitalName, bloodtype, age, phone, state, district, city } = req.body;
 
-    // Basic validation
+    
     if (!email || !password || !role || !phone) {
         console.log('Missing basic fields');
         return res.json({ success: false, message: 'Email, password, role, and phone are required!' });
     }
 
-    // Role-specific validation
     if (role === 'donor' && (!name || !bloodtype || !age || !state || !district || !city)) {
         console.log(' Missing donor fields');
         return res.json({ success: false, message: 'Please provide all donor details!' });
@@ -31,7 +30,6 @@ export const register = async (req, res) => {
         return res.json({ success: false, message: 'Please provide organisation name!' });
     }
 
-    //  Document validation for hospital/organisation
     if ((role === 'hospital' || role === 'organisation') && !req.file) {
         console.log('Missing registration document');
         return res.json({
@@ -61,19 +59,17 @@ export const register = async (req, res) => {
             isAccountVerified: false
         };
 
-        // Add role-specific fields
         if (role === 'donor') {
             userData.name = name;
             userData.bloodtype = bloodtype;
             userData.age = age;
             userData.address = { state, district, city };
             userData.isAvailable = true;
-            userData.approvalStatus = 'approved'; // Donors auto-approved
+            userData.approvalStatus = 'approved'; 
         } else if (role === 'organisation') {
             userData.organisationName = organisationName;
-            userData.approvalStatus = 'pending'; // Needs admin approval
+            userData.approvalStatus = 'pending'; 
 
-            // Store document info
             if (req.file) {
                 userData.registrationDocument = {
                     filename: req.file.filename,
@@ -86,9 +82,8 @@ export const register = async (req, res) => {
             }
         } else if (role === 'hospital') {
             userData.hospitalName = hospitalName;
-            userData.approvalStatus = 'pending'; // Needs admin approval
+            userData.approvalStatus = 'pending';
 
-            // Store document info
             if (req.file) {
                 userData.registrationDocument = {
                     filename: req.file.filename,
@@ -118,7 +113,6 @@ export const register = async (req, res) => {
             maxAge: 24 * 60 * 60 * 1000
         });
 
-        // Send welcome email
         console.log('Attempting to send email...');
         try {
             let emailContent = `
@@ -171,8 +165,18 @@ export const register = async (req, res) => {
                 email: user.email,
                 role: user.role,
                 name: user.name || user.organisationName || user.hospitalName,
+                organisationName: user.organisationName,
+                hospitalName: user.hospitalName,
+                phone: user.phone,
+                bloodtype: user.bloodtype,
+                age: user.age,
+                address: user.address,
+                isAvailable: user.isAvailable,
                 isAccountVerified: user.isAccountVerified,
-                approvalStatus: user.approvalStatus
+                approvalStatus: user.approvalStatus,
+                systemId: user.systemId,
+                nextEligibleDate: user.nextEligibleDate,
+                lastDonationDate: user.lastDonationDate
             }
         });
 
@@ -203,7 +207,6 @@ export const login = async (req, res) => {
             });
         }
 
-        // Check approval status for hospital/organisation
         if ((user.role === 'hospital' || user.role === 'organisation') && user.approvalStatus !== 'approved') {
             if (user.approvalStatus === 'pending') {
                 return res.json({
@@ -241,8 +244,18 @@ export const login = async (req, res) => {
                 email: user.email,
                 role: user.role,
                 name: user.name || user.organisationName || user.hospitalName,
+                organisationName: user.organisationName,
+                hospitalName: user.hospitalName,
+                phone: user.phone,
+                bloodtype: user.bloodtype,
+                age: user.age,
+                address: user.address,
+                isAvailable: user.isAvailable,
                 isAccountVerified: user.isAccountVerified,
-                approvalStatus: user.approvalStatus
+                approvalStatus: user.approvalStatus,
+                systemId: user.systemId,
+                nextEligibleDate: user.nextEligibleDate,
+                lastDonationDate: user.lastDonationDate
             }
         });
 

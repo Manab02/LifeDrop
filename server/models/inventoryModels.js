@@ -2,7 +2,6 @@
 import mongoose from "mongoose";
 
 export const inventorySchema = new mongoose.Schema({
-   // Unique Transaction ID (UUID)
     transactionId: {
         type: String,
         unique: true,
@@ -28,7 +27,6 @@ export const inventorySchema = new mongoose.Schema({
         min: [1, 'Quantity must be at least 1']
     },
 
-    // EXPIRY DATE (REQUIRED)
     expiryDate: {
         type: Date,
         required: [true, 'Expiry date is mandatory for all blood units'],
@@ -40,20 +38,17 @@ export const inventorySchema = new mongoose.Schema({
         }
     },
 
-    // VERIFICATION STATUS
     verified: {
         type: Boolean,
         default: true
     },
 
-    // TRANSACTION STATUS
     status: {
         type: String,
         enum: ['pending', 'approved', 'rejected', 'completed', 'expired'],
         default: 'completed'
     },
 
-    // SOURCE TRACKING (nullable for manual entries)
     source_id: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "user",
@@ -71,7 +66,6 @@ export const inventorySchema = new mongoose.Schema({
         default: ''
     },
 
-    // TARGET TRACKING (nullable for manual entries)
     target_id: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "user",

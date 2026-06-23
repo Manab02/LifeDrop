@@ -1,11 +1,10 @@
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:7000';
 
-// Helper function for API calls WITH CREDENTIALS
 const apiCall = async (endpoint, options = {}) => {
     try {
         const response = await fetch(`${API_URL}${endpoint}`, {
             ...options,
-            credentials: 'include', // Send cookies with request
+            credentials: 'include', 
             headers: {
                 'Content-Type': 'application/json',
                 ...(options.headers || {}),
@@ -85,9 +84,13 @@ export const authAPI = {
         method: 'POST',
         body: JSON.stringify(resetData),
     }),
+
+    changePassword: (data) => apiCall('/api/auth/change-password', {
+        method: 'POST',
+        body: JSON.stringify(data),
+    }),
 };
 
-// Inventory APIs
 export const inventoryAPI = {
     createInventory: (inventoryData) => apiCall('/api/inventory/create-inventory', {
         method: 'POST',
@@ -112,7 +115,6 @@ export const inventoryAPI = {
     }),
 };
 
-// Donor APIs
 export const donorAPI = {
     searchDonors: (searchData) => apiCall('/api/donors/search', {
         method: 'POST',
@@ -133,7 +135,6 @@ export const donorAPI = {
     }),
 };
 
-// Public Search API
 export const publicAPI = {
     search: (searchData) => apiCall('/api/public/search', {
         method: 'POST',
@@ -156,9 +157,7 @@ export const publicAPI = {
     }),
 };
 
-// Complete Admin APIs
 export const adminAPI = {
-    // Get all data
     getDonorList: () => {
         console.log('Fetching donor list...');
         return apiCall('/api/admin/donor-list', {
@@ -180,7 +179,6 @@ export const adminAPI = {
         });
     },
 
-    // Get all inventory
     getAllInventory: () => {
         console.log('Fetching all inventory...');
         return apiCall('/api/admin/all-inventory', {
@@ -188,7 +186,6 @@ export const adminAPI = {
         });
     },
 
-    // Get dashboard stats
     getStats: () => {
         console.log(' Fetching stats...');
         return apiCall('/api/admin/stats', {
@@ -196,12 +193,10 @@ export const adminAPI = {
         });
     },
 
-    // Document viewer
     viewDocument: (userId) => {
         return `${API_URL}/api/admin/view-document/${userId}`;
     },
 
-    // Approval actions
     approveHospital: (id) => apiCall(`/api/admin/approve-hospital/${id}`, {
         method: 'POST',
     }),
@@ -210,7 +205,6 @@ export const adminAPI = {
         method: 'POST',
     }),
 
-    // Rejection actions
     rejectHospital: (id, reason) => apiCall(`/api/admin/reject-hospital/${id}`, {
         method: 'POST',
         body: JSON.stringify({ reason }),
@@ -221,7 +215,6 @@ export const adminAPI = {
         body: JSON.stringify({ reason }),
     }),
 
-    // Delete actions
     deleteDonor: (id) => apiCall(`/api/admin/delete-donor/${id}`, {
         method: 'POST',
     }),
@@ -234,7 +227,6 @@ export const adminAPI = {
         method: 'POST',
     }),
 
-    // Delete inventory
     deleteInventory: (id) => apiCall(`/api/admin/delete-inventory/${id}`, {
         method: 'POST',
     }),

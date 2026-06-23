@@ -11,12 +11,9 @@ const Register = () => {
   const [authorizeDisplay, setAuthorizeDisplay] = useState(false);
   const [loading, setLoading] = useState(false);
   const [document, setDocument] = useState(null); 
-
-  // Location data (ONLY for donors)
   const [states, setStates] = useState([]);
   const [districts, setDistricts] = useState([]);
   const [cities, setCities] = useState([]);
-
   const [formData, setFormData] = useState({
     role: 'donor',
     name: '',
@@ -33,7 +30,6 @@ const Register = () => {
     city: '',
   });
 
-  // Fetch states (only for donors)
   useEffect(() => {
     if (formData.role === 'donor') {
       fetch('/states.json')
@@ -43,7 +39,6 @@ const Register = () => {
     }
   }, [formData.role]);
 
-  // Fetch districts based on state
   useEffect(() => {
     if (formData.state && formData.role === 'donor') {
       fetch('/districts.json')
@@ -59,7 +54,6 @@ const Register = () => {
     }
   }, [formData.state, formData.role]);
 
-  // Fetch cities based on district
   useEffect(() => {
     if (formData.district && formData.role === 'donor') {
       fetch('/cities.json')
@@ -90,13 +84,11 @@ const Register = () => {
       return;
     }
 
-    // Donor-specific validation
     if (formData.role === 'donor' && !authorizeDisplay) {
       Swal.fire('Error', 'Please authorize to display your contact info.', 'warning');
       return;
     }
 
-    // Document validation for hospital/organisation
     if ((formData.role === 'hospital' || formData.role === 'organisation') && !document) {
       Swal.fire('Error', 'Please upload your registration document!', 'warning');
       return;
@@ -105,9 +97,7 @@ const Register = () => {
     setLoading(true);
 
     try {
-      // Use FormData for file upload
       const submitData = new FormData();
-
       submitData.append('role', formData.role);
       submitData.append('email', formData.email);
       submitData.append('password', formData.password);
@@ -188,7 +178,6 @@ const Register = () => {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Role Selection */}
           <div>
             <label className="block text-red-600 font-semibold mb-2">Select Role *</label>
             <select

@@ -16,8 +16,6 @@ const About = () => {
                         </p>
                     </div>
                 </section>
-
-                {/* Mission & Vision */}
                 <section className="py-16 px-6 text-center">
                     <div className="max-w-5xl mx-auto">
                         <h2 className="text-3xl font-bold text-red-700 mb-6">Our Mission</h2>
@@ -34,8 +32,6 @@ const About = () => {
                         </p>
                     </div>
                 </section>
-
-                {/* What Makes Us Different */}
                 <section className="py-16 bg-white px-6">
                     <div className="max-w-6xl mx-auto text-center">
                         <h2 className="text-3xl font-bold text-red-700 mb-12">
@@ -78,7 +74,6 @@ const About = () => {
                     </div>
                 </section>
 
-                {/* CTA Section */}
                 <section className="bg-red-700 text-white text-center py-20 px-6">
                     <h2 className="text-3xl md:text-4xl font-bold mb-6">
                         Join Our Movement – Be Someone's Lifeline

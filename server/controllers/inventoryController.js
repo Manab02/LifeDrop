@@ -22,7 +22,7 @@ const createAuditLog = async (userId, userRole, action, description, targetType,
 
 export const createInventory = async (req, res) => {
     try {
-        console.log('📦 Create Inventory Request Body:', req.body);
+        console.log(' Create Inventory Request Body:', req.body);
 
         const {
             email,
@@ -42,9 +42,9 @@ export const createInventory = async (req, res) => {
             isManualEntry
         } = req.body;
 
-        // BASIC VALIDATION
+    
         if (!bloodGroup) {
-            console.log('❌ Missing blood group');
+            console.log(' Missing blood group');
             return res.json({
                 success: false,
                 message: 'Blood group is required'
@@ -52,7 +52,7 @@ export const createInventory = async (req, res) => {
         }
 
         if (!quantity || quantity < 1) {
-            console.log('❌ Invalid quantity');
+            console.log(' Invalid quantity');
             return res.json({
                 success: false,
                 message: 'Valid quantity is required (minimum 1 unit)'
@@ -60,52 +60,51 @@ export const createInventory = async (req, res) => {
         }
 
         if (!expiryDate) {
-            console.log('❌ Missing expiry date');
+            console.log(' Missing expiry date');
             return res.json({
                 success: false,
                 message: 'Expiry date is mandatory for all blood units'
             });
         }
 
-        // Validate expiry date is in the future
+        
         const expiryDateObj = new Date(expiryDate);
         if (expiryDateObj <= new Date()) {
-            console.log('❌ Expiry date in past');
+            console.log(' Expiry date in past');
             return res.json({
                 success: false,
                 message: 'Expiry date must be in the future'
             });
         }
 
-        // AUTO-DETECT inventoryType if not provided
-        let finalInventoryType = inventoryType;
         
+        let finalInventoryType = inventoryType;
+
         if (!finalInventoryType) {
-            // If donor is provided, it's an IN transaction
+            
             if (donor || email) {
                 finalInventoryType = 'in';
-                console.log('✅ Auto-detected inventoryType: IN (donor donation)');
+                console.log('Auto-detected inventoryType: IN (donor donation)');
             }
-            // If hospital is provided without donor, it's an OUT transaction
+        
             else if (hospital) {
                 finalInventoryType = 'out';
-                console.log('✅ Auto-detected inventoryType: OUT (hospital request)');
+                console.log('Auto-detected inventoryType: OUT (hospital request)');
             }
-            // Default to IN if we have an organisation
+            
             else if (organisation) {
                 finalInventoryType = 'in';
-                console.log('✅ Auto-detected inventoryType: IN (organisation collection)');
+                console.log('Auto-detected inventoryType: IN (organisation collection)');
             }
             else {
-                // Fallback - shouldn't reach here
+                
                 finalInventoryType = 'in';
-                console.log('⚠️ Defaulting to inventoryType: IN');
+                console.log('Defaulting to inventoryType: IN');
             }
         }
 
-        console.log('📋 Final Inventory Type:', finalInventoryType);
+        console.log('Final Inventory Type:', finalInventoryType);
 
-        // Build inventory data
         const inventoryData = {
             inventoryType: finalInventoryType,
             bloodGroup,
@@ -118,8 +117,6 @@ export const createInventory = async (req, res) => {
             verified: !isManualEntry,
             status: 'completed'
         };
-
-        // Handle manual entries
         if (isManualEntry) {
             inventoryData.verified = false;
             inventoryData.source_type = 'manual';
@@ -140,7 +137,7 @@ export const createInventory = async (req, res) => {
                 inventory.transactionId
             );
 
-            console.log('✅ Manual entry created:', inventory.transactionId);
+            console.log('Manual entry created:', inventory.transactionId);
 
             return res.json({
                 success: true,
@@ -148,8 +145,6 @@ export const createInventory = async (req, res) => {
                 inventory
             });
         }
-
-        // Handle organisation
         let orgUser = null;
         if (organisation) {
             orgUser = await userModel.findOne({
@@ -158,21 +153,19 @@ export const createInventory = async (req, res) => {
             });
 
             if (!orgUser) {
-                console.log('❌ Organisation not found:', organisation);
+                console.log('Organisation not found:', organisation);
                 return res.json({
                     success: false,
                     message: 'Organisation not found or invalid'
                 });
             }
             inventoryData.organisation = orgUser._id;
-            console.log('✅ Organisation found:', orgUser.organisationName);
+            console.log('Organisation found:', orgUser.organisationName);
         }
 
-        // Handle IN transactions (donations)
         if (finalInventoryType === "in") {
-            // Try to find donor by email
             let donorEmail = donor || email;
-            
+
             if (donorEmail) {
                 const donorUser = await userModel.findOne({
                     email: donorEmail,
@@ -191,7 +184,14 @@ export const createInventory = async (req, res) => {
                 inventoryData.source_id = donorUser._id;
                 inventoryData.source_type = 'donor';
 
-                // Mark donor as unavailable and set next eligible date
+                if (donorUser.nextEligibleDate && donorUser.nextEligibleDate > new Date()) {
+                    const daysLeft = Math.ceil((donorUser.nextEligibleDate - new Date()) / (1000 * 60 * 60 * 24));
+                    return res.json({
+                        success: false,
+                        message: `Donor is not eligible yet. ${daysLeft} days remaining until next donation.`
+                    });
+                }
+
                 donorUser.isAvailable = false;
                 donorUser.lastDonationDate = new Date();
 
@@ -203,15 +203,12 @@ export const createInventory = async (req, res) => {
                 console.log(`Donor ${donorUser.name} marked unavailable until ${nextEligible.toDateString()}`);
             }
 
-            // Set target (organisation receiving the blood)
             if (orgUser) {
                 inventoryData.target_id = orgUser._id;
                 inventoryData.target_type = 'organisation';
             }
-        } 
-        // Handle OUT transactions (distributions)
+        }
         else if (finalInventoryType === "out") {
-            // Try to find hospital by email
             if (hospital) {
                 const hospitalUser = await userModel.findOne({
                     email: hospital,
@@ -219,27 +216,23 @@ export const createInventory = async (req, res) => {
                 });
 
                 if (!hospitalUser) {
-                    console.log('❌ Hospital not found:', hospital);
+                    console.log('Hospital not found:', hospital);
                     return res.json({
                         success: false,
                         message: 'Hospital not found or invalid'
                     });
                 }
-
                 inventoryData.hospital = hospitalUser._id;
                 inventoryData.target_id = hospitalUser._id;
                 inventoryData.target_type = 'hospital';
-                console.log('✅ Hospital found:', hospitalUser.hospitalName);
+                console.log(' Hospital found:', hospitalUser.hospitalName);
             }
-
-            // Set source (organisation providing the blood)
             if (orgUser) {
                 inventoryData.source_id = orgUser._id;
                 inventoryData.source_type = 'organisation';
             }
         }
 
-        // Create inventory record
         const inventory = new inventoryModels(inventoryData);
         await inventory.save();
 
@@ -254,7 +247,7 @@ export const createInventory = async (req, res) => {
             { inventoryData }
         );
 
-        console.log('✅ Inventory created successfully:', inventory.transactionId);
+        console.log('Inventory created successfully:', inventory.transactionId);
 
         return res.json({
             success: true,
@@ -263,7 +256,7 @@ export const createInventory = async (req, res) => {
         });
 
     } catch (error) {
-        console.error('❌ Create inventory error:', error);
+        console.error('Create inventory error:', error);
         res.json({
             success: false,
             message: error.message

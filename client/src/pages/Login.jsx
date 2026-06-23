@@ -48,10 +48,8 @@ const Login = () => {
       if (data.success) {
         alert(`Login successful! Welcome ${data.user?.name}`);
 
-        // Store user data in localStorage
         localStorage.setItem('user', JSON.stringify(data.user));
 
-        // Redirect based on role
         switch (role) {
           case 'donor':
             navigate('/donor-dashboard');
@@ -98,7 +96,6 @@ const Login = () => {
           </div>
 
           <form onSubmit={handleSubmit}>
-            {/* Role Selection */}
             <div className="relative mb-6">
               <select
                 id="role"
@@ -120,8 +117,6 @@ const Login = () => {
               </label>
               <User className="absolute right-2 top-3 text-gray-400 pointer-events-none" size={18} />
             </div>
-
-            {/* Email */}
             <div className="relative mb-6">
               <input
                 type="email"
@@ -144,8 +139,6 @@ const Login = () => {
               </label>
               <Mail className="absolute right-2 top-3 text-gray-400 pointer-events-none" size={18} />
             </div>
-
-            {/* Password */}
             <div className="relative mb-6">
               <input
                 type={showPassword ? 'text' : 'password'}
@@ -174,8 +167,6 @@ const Login = () => {
                 {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
             </div>
-
-            {/* CAPTCHA */}
             <div className="flex flex-col sm:flex-row items-center justify-between mb-6 space-y-3 sm:space-y-0 sm:space-x-3">
               <div className="relative flex-1 w-full">
                 <input
@@ -213,7 +204,6 @@ const Login = () => {
               </div>
             </div>
 
-            {/* Remember Me + Forgot Password */}
             <div className="flex justify-between items-center text-sm mb-6">
               <label className="flex items-center space-x-2 cursor-pointer">
                 <input
@@ -228,8 +218,6 @@ const Login = () => {
                 Forgot Password?
               </a>
             </div>
-
-            {/* Login Button */}
             <button
               type="submit"
               disabled={loading}
@@ -237,27 +225,22 @@ const Login = () => {
             >
               {loading ? 'Logging in...' : `Login as ${role.charAt(0).toUpperCase() + role.slice(1)}`}
             </button>
-
-            {/* Continue With */}
             <div className="my-6 flex items-center justify-center">
               <span className="h-px w-16 bg-gray-300"></span>
               <span className="mx-3 text-gray-500 text-sm">or continue with</span>
               <span className="h-px w-16 bg-gray-300"></span>
             </div>
 
-            <div className="flex justify-center space-x-4">
-              <button type="button" className="border border-gray-300 rounded-full p-2 hover:bg-gray-100 transition">
-                <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/google/google-original.svg" alt="Google" className="w-6 h-6" />
-              </button>
-              <button type="button" className="border border-gray-300 rounded-full p-2 hover:bg-gray-100 transition">
-                <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/facebook/facebook-original.svg" alt="Facebook" className="w-6 h-6" />
-              </button>
-              <button type="button" className="border border-gray-300 rounded-full p-2 hover:bg-gray-100 transition">
-                <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/github/github-original.svg" alt="GitHub" className="w-6 h-6" />
+            <div className="flex justify-center">
+              <button
+                type="button"
+                onClick={() => window.location.href = `${import.meta.env.VITE_API_URL || 'http://localhost:7000'}/api/auth/google`}
+                className="flex items-center gap-3 border border-gray-300 rounded-full px-6 py-2 hover:bg-gray-50 transition font-medium text-gray-700"
+              >
+                <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/google/google-original.svg" alt="Google" className="w-5 h-5" />
+                Continue with Google
               </button>
             </div>
-
-            {/* Register */}
             <div className="text-center mt-6 text-sm">
               <p>
                 Don't have an account?{' '}

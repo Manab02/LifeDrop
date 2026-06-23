@@ -3,19 +3,16 @@ import path from 'path';
 import fs from 'fs';
 
 
-// Create uploads directory if it doesn't exist
 const uploadDir = './uploads/documents';
 if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });
 }
 
-// Configure storage
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
         cb(null, uploadDir);
     },
     filename: function (req, file, cb) {
-        // Generate unique filename: timestamp
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
         const ext = path.extname(file.originalname);
         const nameWithoutExt = path.basename(file.originalname, ext);
@@ -23,7 +20,6 @@ const storage = multer.diskStorage({
     }
 });
 
-// File - only allow PDF, JPG, PNG
 const fileFilter = (req, file, cb) => {
     const allowedTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
 
@@ -42,7 +38,6 @@ const upload = multer({
     }
 });
 
-//  Export single file upload middleware
 export const uploadDocument = upload.single('registrationDocument');
 
 export const handleUploadError = (err, req, res, next) => {

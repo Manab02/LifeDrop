@@ -7,12 +7,11 @@ const EmailVerify = () => {
     const [otp, setOtp] = useState(['', '', '', '', '', '']);
     const [loading, setLoading] = useState(false);
     const [resendLoading, setResendLoading] = useState(false);
-    const [timer, setTimer] = useState(120);       // 2 minutes otp validation
+    const [timer, setTimer] = useState(120);                 // 2 minutes otp validation
     const [canResend, setCanResend] = useState(false);
-    const hasOtpBeenSent = useRef(false); // Track if OTP has been sent
+    const hasOtpBeenSent = useRef(false);                     // Track if OTP has been sent
 
     useEffect(() => {
-        // Check if user is logged in
         const user = JSON.parse(localStorage.getItem('user') || '{}');
         if (!user.id) {
             navigate('/login');
@@ -24,7 +23,6 @@ const EmailVerify = () => {
             sendOtp();
         }
 
-        // Start countdown timer
         const interval = setInterval(() => {
             setTimer((prev) => {
                 if (prev <= 1) {
@@ -37,7 +35,7 @@ const EmailVerify = () => {
         }, 1000);
 
         return () => clearInterval(interval);
-    }, []); // Empty dependency array ensures this runs only once
+    }, []);                                     // Empty dependency array ensures this runs only once
 
     const sendOtp = async () => {
         try {
@@ -62,7 +60,6 @@ const EmailVerify = () => {
             const data = await authAPI.sendVerifyOtp();
             if (data.success) {
                 alert('OTP resent successfully!');
-                // Restart timer
                 const interval = setInterval(() => {
                     setTimer((prev) => {
                         if (prev <= 1) {
@@ -141,7 +138,6 @@ const EmailVerify = () => {
                 user.isAccountVerified = true;
                 localStorage.setItem('user', JSON.stringify(user));
 
-                // Redirect based on role
                 switch (user.role) {
                     case 'donor':
                         navigate('/donor-dashboard');

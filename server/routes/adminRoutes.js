@@ -587,11 +587,11 @@ router.post('/approve-hospital/:id', userAuth, isAdmin, async (req, res) => {
                             </p>
                             <div style="background-color: #f3f4f6; border-radius: 6px; padding: 20px; margin: 20px 0;">
                                 <ul style="margin: 0; padding-left: 20px;">
-                                    <li style="margin-bottom: 10px;">✅ Login to your hospital account</li>
-                                    <li style="margin-bottom: 10px;">✅ Add your hospital address and details</li>
-                                    <li style="margin-bottom: 10px;">✅ Update blood bank inventory</li>
-                                    <li style="margin-bottom: 10px;">✅ Manage blood stock levels</li>
-                                    <li style="margin-bottom: 10px;">✅ Request blood from organizations</li>
+                                    <li style="margin-bottom: 10px;">Login to your hospital account</li>
+                                    <li style="margin-bottom: 10px;"> Add your hospital address and details</li>
+                                    <li style="margin-bottom: 10px;"> Update blood bank inventory</li>
+                                    <li style="margin-bottom: 10px;"> Manage blood stock levels</li>
+                                    <li style="margin-bottom: 10px;"> Request blood from organizations</li>
                                 </ul>
                             </div>
                             <div style="text-align: center; margin-top: 30px;">
@@ -678,11 +678,11 @@ router.post('/approve-organisation/:id', userAuth, isAdmin, async (req, res) => 
                             </p>
                             <div style="background-color: #f3f4f6; border-radius: 6px; padding: 20px; margin: 20px 0;">
                                 <ul style="margin: 0; padding-left: 20px;">
-                                    <li style="margin-bottom: 10px;">✅ Login to your organisation account</li>
-                                    <li style="margin-bottom: 10px;">✅ Add your organisation address</li>
-                                    <li style="margin-bottom: 10px;">✅ Collect blood from donors</li>
-                                    <li style="margin-bottom: 10px;">✅ Distribute blood to hospitals</li>
-                                    <li style="margin-bottom: 10px;">✅ Organize blood donation camps</li>
+                                    <li style="margin-bottom: 10px;"> Login to your organisation account</li>
+                                    <li style="margin-bottom: 10px;"> Add your organisation address</li>
+                                    <li style="margin-bottom: 10px;"> Collect blood from donors</li>
+                                    <li style="margin-bottom: 10px;"> Distribute blood to hospitals</li>
+                                    <li style="margin-bottom: 10px;"> Organize blood donation camps</li>
                                 </ul>
                             </div>
                             <div style="text-align: center; margin-top: 30px;">

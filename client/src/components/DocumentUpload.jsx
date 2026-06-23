@@ -7,7 +7,7 @@ const DocumentUpload = ({ onFileSelect, required = false, error = null }) => {
     const [dragActive, setDragActive] = useState(false);
 
     const allowedTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
-    const maxSize = 5 * 1024 * 1024;            // 5MB is (Max Size)
+    const maxSize = 5 * 1024 * 1024;          
 
     const validateFile = (file) => {
         if (!file) return 'Please select a file';

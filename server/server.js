@@ -14,10 +14,12 @@ import publicRouter from "./routes/publicRoutes.js";
 import hospitalRouter from "./routes/hospitalRoutes.js";
 import organisationRouter from "./routes/organisationRoutes.js";
 import fs from 'fs';
+import feedbackRouter from "./routes/feedbackRoutes.js";
+import passport from "passport";
+import "./config/passport.js";
 import { checkExpiredBlood } from './services/expiryService.js';
 
 
-// ES Module __dirname equivalent
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -35,6 +37,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan('dev'));
 app.use(cookieParser());
+app.use(passport.initialize());
 
 // Serve uploaded files statically
 //app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
@@ -71,6 +74,7 @@ app.use('/api/public', publicRouter);
 app.use('/api/hospital', hospitalRouter);
 app.use('/api/organisation', organisationRouter);
 app.use('/api/admin', adminRouter);
+app.use('/api/feedback', feedbackRouter);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
@@ -94,7 +98,7 @@ app.use('/api', (req, res) => {
 setInterval(async () => {
     console.log(' Running scheduled expiry check...');
     await checkExpiredBlood();
-}, 24 * 60 * 60 * 1000); // 24 hours
+}, 24 * 60 * 60 * 1000);
 
 setTimeout(async () => {
     console.log('Running initial expiry check...');
@@ -115,13 +119,13 @@ app.listen(port, () => {
 });
 // Handle unhandled promise rejections
 process.on('unhandledRejection', (err) => {
-    console.error('❌ Unhandled Promise Rejection:', err);
+    console.error('Unhandled Promise Rejection:', err);
     process.exit(1);
 });
 
 // Handle uncaught exceptions
 process.on('uncaughtException', (err) => {
-    console.error('❌ Uncaught Exception:', err);
+    console.error('Uncaught Exception:', err);
     process.exit(1);
 });
 

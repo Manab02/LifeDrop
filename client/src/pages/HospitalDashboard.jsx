@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authAPI, inventoryAPI } from '../services/api';
-import RequestBloodModal from '../components/RequestBloodModal';
 import ManualAddInventoryModal from '../components/ManualAddInventoryModal';
 import EditInventoryModal from '../components/EditInventoryModal';
 
@@ -33,7 +32,6 @@ const HospitalDashboard = () => {
         notes: ''
     });
 
-    // Request Blood Modal State
     const [requestFormData, setRequestFormData] = useState({
         bloodGroup: '',
         quantity: '',
@@ -85,7 +83,6 @@ const HospitalDashboard = () => {
 
                 setInventory(hospitalRecords);
 
-                // Filter OUT requests (blood requests made by this hospital)
                 const requests = hospitalRecords.filter(
                     item => item.inventoryType === 'out'
                 );
@@ -140,7 +137,6 @@ const HospitalDashboard = () => {
             }
         });
 
-        // Ensure total never goes below 0 for display
         Object.keys(stock).forEach(group => {
             if (stock[group].total < 0) {
                 stock[group].total = 0;
@@ -171,7 +167,6 @@ const HospitalDashboard = () => {
             }
         });
 
-        // Ensure units available is never negative
         totalUnits = Math.max(0, totalUnits);
 
         const expiringCount = inventoryData.filter(item => {
@@ -204,7 +199,6 @@ const HospitalDashboard = () => {
         const notifs = [];
         const now = new Date();
 
-        // Check completed requests
         requests.forEach(request => {
             if (request.status === 'completed' || request.status === 'approved') {
                 const timeDiff = now - new Date(request.updatedAt || request.createdAt);
@@ -314,7 +308,7 @@ const HospitalDashboard = () => {
         }
 
         try {
-            const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:7000'}/api/inventory/add-inventory`, {
+            const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:7000'}/api/inventory/create-inventory`, {
                 method: 'POST',
                 credentials: 'include',
                 headers: { 'Content-Type': 'application/json' },
@@ -390,7 +384,7 @@ const HospitalDashboard = () => {
 
     const handleLogout = async () => {
         try {
-            await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:7000'}/api/v1/auth/logout`, {
+            await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:7000'}/api/auth/logout`, {
                 method: 'GET',
                 credentials: 'include'
             });

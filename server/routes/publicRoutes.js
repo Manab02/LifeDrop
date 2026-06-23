@@ -16,20 +16,19 @@ router.post('/search', async (req, res) => {
             });
         }
 
-        // Build base query
+        
         let query = {
             approvalStatus: 'approved',
             isAccountVerified: true
         };
 
-        // Add type-specific filters
         if (type === 'donor') {
             query.role = 'donor';
             query.isAvailable = true;
 
             if (bloodGroup) query.bloodtype = bloodGroup;
 
-            // Address filters for donors
+            
             if (state) query['address.state'] = state;
             if (district) query['address.district'] = district;
             if (city) query['address.city'] = city;
@@ -48,7 +47,6 @@ router.post('/search', async (req, res) => {
         } else if (type === 'hospital') {
             query.role = 'hospital';
 
-            // Address filters for hospitals
             if (state) query['address.state'] = state;
             if (district) query['address.district'] = district;
             if (city) query['address.city'] = city;
@@ -57,14 +55,13 @@ router.post('/search', async (req, res) => {
                 .find(query)
                 .select('hospitalName email phone address');
 
-            // Calculate blood stock for each hospital
+            
             const hospitalsWithStock = await Promise.all(
                 hospitals.map(async (hospital) => {
                     const inventory = await inventoryModels.find({
                         hospital: hospital._id
                     });
 
-                    // Calculate stock
                     const bloodGroups = ['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'];
                     const bloodStock = {};
 
@@ -80,9 +77,8 @@ router.post('/search', async (req, res) => {
                         }
                     });
 
-                    // Filter by requested blood group if specified
                     if (bloodGroup && bloodStock[bloodGroup] <= 0) {
-                        return null; // Skip hospitals without requested blood
+                        return null; 
                     }
 
                     return {
@@ -97,7 +93,6 @@ router.post('/search', async (req, res) => {
                 })
             );
 
-            // Remove null entries (hospitals without requested blood)
             const filteredHospitals = hospitalsWithStock.filter(h => h !== null);
 
             return res.json({
@@ -110,7 +105,6 @@ router.post('/search', async (req, res) => {
         } else if (type === 'organisation') {
             query.role = 'organisation';
 
-            // Address filters for organisations
             if (state) query['address.state'] = state;
             if (district) query['address.district'] = district;
             if (city) query['address.city'] = city;
@@ -119,14 +113,12 @@ router.post('/search', async (req, res) => {
                 .find(query)
                 .select('organisationName email phone address');
 
-            // Calculate blood stock for each organisation
             const organisationsWithStock = await Promise.all(
                 organisations.map(async (org) => {
                     const inventory = await inventoryModels.find({
                         organisation: org._id
                     });
 
-                    // Calculate stock
                     const bloodGroups = ['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'];
                     const bloodStock = {};
 
@@ -142,9 +134,8 @@ router.post('/search', async (req, res) => {
                         }
                     });
 
-                    // Filter by requested blood group if specified
                     if (bloodGroup && bloodStock[bloodGroup] <= 0) {
-                        return null; // Skip organisations without requested blood
+                        return null; 
                     }
 
                     return {
@@ -159,7 +150,6 @@ router.post('/search', async (req, res) => {
                 })
             );
 
-            // Remove null entries
             const filteredOrganisations = organisationsWithStock.filter(o => o !== null);
 
             return res.json({
@@ -185,7 +175,6 @@ router.post('/search', async (req, res) => {
     }
 });
 
-//LEGACY: Keep old endpoints for backward compatibility
 router.post('/search-donors', async (req, res) => {
     try {
         const { bloodGroup, state, district, city } = req.body;
@@ -294,7 +283,6 @@ router.post('/search-organisations', async (req, res) => {
     }
 });
 
-// GET list of approved hospitals
 router.get('/get-hospitals', async (req, res) => {
     try {
         const hospitals = await userModel.find({
@@ -319,7 +307,6 @@ router.get('/get-hospitals', async (req, res) => {
     }
 });
 
-// GET list of approved organisations
 router.get('/get-organisations', async (req, res) => {
     try {
         const organisations = await userModel.find({

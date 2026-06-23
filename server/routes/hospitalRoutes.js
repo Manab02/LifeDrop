@@ -4,13 +4,10 @@ import { getHospitalProfile, updateHospitalProfile, getBloodStock } from "../con
 
 const router = express.Router();
 
-// GET hospital profile
 router.get('/profile', userAuth, getHospitalProfile);
 
-// UPDATE hospital profile
 router.put('/profile', userAuth, updateHospitalProfile);
 
-// GET blood stock
 router.get('/blood-stock', userAuth, getBloodStock);
 
 export default router;
