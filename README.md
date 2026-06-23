@@ -14,4 +14,4 @@ SMTP_SERVICE=your_smtp_service
 SENDER_EMAIL=your_sender_email
 
 FRONTEND_URL=http://localhost:5173
-VITE_API_URL=http://localhost:7000   //For Backend
+VITE_API_URL=http://localhost:7000 
