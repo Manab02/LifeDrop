@@ -13,10 +13,7 @@ import adminRouter from "./routes/adminRoutes.js";
 import publicRouter from "./routes/publicRoutes.js";
 import hospitalRouter from "./routes/hospitalRoutes.js";
 import organisationRouter from "./routes/organisationRoutes.js";
-<<<<<<< HEAD
 import transferRouter from "./routes/transferRoutes.js";
-=======
->>>>>>> 142ce276d2e571211da685c661614482fd0df331
 import fs from 'fs';
 import feedbackRouter from "./routes/feedbackRoutes.js";
 import passport from "passport";
@@ -77,10 +74,7 @@ app.use('/api/donors', donorRouter);
 app.use('/api/public', publicRouter);
 app.use('/api/hospital', hospitalRouter);
 app.use('/api/organisation', organisationRouter);
-<<<<<<< HEAD
 app.use('/api/transfer', transferRouter);
-=======
->>>>>>> 142ce276d2e571211da685c661614482fd0df331
 app.use('/api/admin', adminRouter);
 app.use('/api/feedback', feedbackRouter);
 

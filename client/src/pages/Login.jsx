@@ -1,10 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Eye, EyeOff, Mail, RefreshCw, User } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-
 import { authAPI, API_URL } from '../services/api';
-import { authAPI } from '../services/api';
-
 
 const Login = () => {
   const navigate = useNavigate();

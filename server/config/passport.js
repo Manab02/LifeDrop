@@ -20,11 +20,7 @@ passport.use(new GoogleStrategy({
                 }
                 return done(null, user);
             }
-
-<<<<<<< HEAD
-=======
             // New user — create as donor
->>>>>>> 142ce276d2e571211da685c661614482fd0df331
             user = await userModel.create({
                 role: 'donor',
                 name: profile.displayName,

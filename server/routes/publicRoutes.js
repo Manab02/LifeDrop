@@ -1,7 +1,3 @@
-<<<<<<< HEAD
-=======
-
->>>>>>> 142ce276d2e571211da685c661614482fd0df331
 import express from "express";
 import userModel from "../models/userModels.js";
 import inventoryModels from "../models/inventoryModels.js";
@@ -19,11 +15,7 @@ router.post('/search', async (req, res) => {
             });
         }
 
-<<<<<<< HEAD
 
-=======
-        
->>>>>>> 142ce276d2e571211da685c661614482fd0df331
         let query = {
             approvalStatus: 'approved',
             isAccountVerified: true
@@ -35,11 +27,7 @@ router.post('/search', async (req, res) => {
 
             if (bloodGroup) query.bloodtype = bloodGroup;
 
-<<<<<<< HEAD
 
-=======
-            
->>>>>>> 142ce276d2e571211da685c661614482fd0df331
             if (state) query['address.state'] = state;
             if (district) query['address.district'] = district;
             if (city) query['address.city'] = city;
@@ -66,11 +54,7 @@ router.post('/search', async (req, res) => {
                 .find(query)
                 .select('hospitalName email phone address');
 
-<<<<<<< HEAD
 
-=======
-            
->>>>>>> 142ce276d2e571211da685c661614482fd0df331
             const hospitalsWithStock = await Promise.all(
                 hospitals.map(async (hospital) => {
                     const inventory = await inventoryModels.find({
@@ -93,11 +77,7 @@ router.post('/search', async (req, res) => {
                     });
 
                     if (bloodGroup && bloodStock[bloodGroup] <= 0) {
-<<<<<<< HEAD
                         return null;
-=======
-                        return null; 
->>>>>>> 142ce276d2e571211da685c661614482fd0df331
                     }
 
                     return {
@@ -154,11 +134,7 @@ router.post('/search', async (req, res) => {
                     });
 
                     if (bloodGroup && bloodStock[bloodGroup] <= 0) {
-<<<<<<< HEAD
                         return null;
-=======
-                        return null; 
->>>>>>> 142ce276d2e571211da685c661614482fd0df331
                     }
 
                     return {
@@ -214,11 +190,7 @@ router.post('/search-donors', async (req, res) => {
             bloodtype: bloodGroup,
             isAccountVerified: true,
             approvalStatus: 'approved',
-<<<<<<< HEAD
             isAvailable: true
-=======
-            isAvailable: true  
->>>>>>> 142ce276d2e571211da685c661614482fd0df331
         };
 
         if (state) query['address.state'] = state;
@@ -358,7 +330,6 @@ router.get('/get-organisations', async (req, res) => {
     }
 });
 
-<<<<<<< HEAD
 router.post('/get-donor-by-email', async (req, res) => {
     try {
         const { email } = req.body;
@@ -405,6 +376,4 @@ router.post('/check-org-stock', async (req, res) => {
     }
 });
 
-=======
->>>>>>> 142ce276d2e571211da685c661614482fd0df331
 export default router;
