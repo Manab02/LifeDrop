@@ -1,4 +1,7 @@
+<<<<<<< HEAD
+=======
 
+>>>>>>> 142ce276d2e571211da685c661614482fd0df331
 import express from "express";
 import userModel from "../models/userModels.js";
 import inventoryModels from "../models/inventoryModels.js";
@@ -16,7 +19,11 @@ router.post('/search', async (req, res) => {
             });
         }
 
+<<<<<<< HEAD
+
+=======
         
+>>>>>>> 142ce276d2e571211da685c661614482fd0df331
         let query = {
             approvalStatus: 'approved',
             isAccountVerified: true
@@ -28,7 +35,11 @@ router.post('/search', async (req, res) => {
 
             if (bloodGroup) query.bloodtype = bloodGroup;
 
+<<<<<<< HEAD
+
+=======
             
+>>>>>>> 142ce276d2e571211da685c661614482fd0df331
             if (state) query['address.state'] = state;
             if (district) query['address.district'] = district;
             if (city) query['address.city'] = city;
@@ -55,7 +66,11 @@ router.post('/search', async (req, res) => {
                 .find(query)
                 .select('hospitalName email phone address');
 
+<<<<<<< HEAD
+
+=======
             
+>>>>>>> 142ce276d2e571211da685c661614482fd0df331
             const hospitalsWithStock = await Promise.all(
                 hospitals.map(async (hospital) => {
                     const inventory = await inventoryModels.find({
@@ -78,7 +93,11 @@ router.post('/search', async (req, res) => {
                     });
 
                     if (bloodGroup && bloodStock[bloodGroup] <= 0) {
+<<<<<<< HEAD
+                        return null;
+=======
                         return null; 
+>>>>>>> 142ce276d2e571211da685c661614482fd0df331
                     }
 
                     return {
@@ -135,7 +154,11 @@ router.post('/search', async (req, res) => {
                     });
 
                     if (bloodGroup && bloodStock[bloodGroup] <= 0) {
+<<<<<<< HEAD
+                        return null;
+=======
                         return null; 
+>>>>>>> 142ce276d2e571211da685c661614482fd0df331
                     }
 
                     return {
@@ -191,7 +214,11 @@ router.post('/search-donors', async (req, res) => {
             bloodtype: bloodGroup,
             isAccountVerified: true,
             approvalStatus: 'approved',
+<<<<<<< HEAD
+            isAvailable: true
+=======
             isAvailable: true  
+>>>>>>> 142ce276d2e571211da685c661614482fd0df331
         };
 
         if (state) query['address.state'] = state;
@@ -331,4 +358,53 @@ router.get('/get-organisations', async (req, res) => {
     }
 });
 
+<<<<<<< HEAD
+router.post('/get-donor-by-email', async (req, res) => {
+    try {
+        const { email } = req.body;
+        if (!email) return res.json({ success: false, message: 'Email required' });
+
+        const donor = await userModel.findOne({
+            email: email.toLowerCase().trim(),
+            role: 'donor'
+        }).select('name bloodtype email');
+
+        if (!donor) return res.json({ success: false, message: 'Donor not found' });
+
+        return res.json({ success: true, donor: { name: donor.name, bloodtype: donor.bloodtype, email: donor.email } });
+    } catch (error) {
+        return res.json({ success: false, message: error.message });
+    }
+});
+
+router.post('/check-org-stock', async (req, res) => {
+    try {
+        const { organisationId, bloodGroup, quantity } = req.body;
+        if (!organisationId || !bloodGroup || !quantity)
+            return res.json({ success: false, message: 'Missing required fields' });
+
+        const inventory = await inventoryModels.find({
+            organisation: organisationId,
+            bloodGroup,
+            status: { $ne: 'expired' },
+            expiryDate: { $gt: new Date() }
+        });
+
+        let net = 0;
+        inventory.forEach(item => {
+            net += item.inventoryType === 'in' ? item.quantity : -item.quantity;
+        });
+        net = Math.max(0, net);
+
+        if (net === 0) return res.json({ success: false, message: `This organisation has no ${bloodGroup} blood in stock` });
+        if (net < quantity) return res.json({ success: false, message: `Insufficient stock. Organisation has only ${net} units of ${bloodGroup}` });
+
+        return res.json({ success: true, available: net });
+    } catch (error) {
+        return res.json({ success: false, message: error.message });
+    }
+});
+
+=======
+>>>>>>> 142ce276d2e571211da685c661614482fd0df331
 export default router;

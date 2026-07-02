@@ -4,7 +4,11 @@ const apiCall = async (endpoint, options = {}) => {
     try {
         const response = await fetch(`${API_URL}${endpoint}`, {
             ...options,
+<<<<<<< HEAD
+            credentials: 'include',
+=======
             credentials: 'include', 
+>>>>>>> 142ce276d2e571211da685c661614482fd0df331
             headers: {
                 'Content-Type': 'application/json',
                 ...(options.headers || {}),
@@ -113,6 +117,14 @@ export const inventoryAPI = {
         method: 'PUT',
         body: JSON.stringify(updateData),
     }),
+<<<<<<< HEAD
+
+    walkinDonation: (data) => apiCall('/api/inventory/walkin-donation', {
+        method: 'POST',
+        body: JSON.stringify(data),
+    }),
+=======
+>>>>>>> 142ce276d2e571211da685c661614482fd0df331
 };
 
 export const donorAPI = {
@@ -232,4 +244,40 @@ export const adminAPI = {
     }),
 };
 
+<<<<<<< HEAD
+export const organisationAPI = {
+    getProfile: () => apiCall('/api/organisation/profile', { method: 'GET' }),
+    getCamps: () => apiCall('/api/organisation/camps', { method: 'GET' }),
+    createCamp: (data) => apiCall('/api/organisation/camps', { method: 'POST', body: JSON.stringify(data) }),
+    updateCamp: (id, data) => apiCall(`/api/organisation/camps/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    deleteCamp: (id) => apiCall(`/api/organisation/camps/${id}`, { method: 'DELETE' }),
+    getCampNotifications: () => apiCall('/api/organisation/camp-notifications', { method: 'GET' }),
+    getDonors: () => apiCall('/api/organisation/donors', { method: 'GET' }),
+    getBloodStock: () => apiCall('/api/organisation/blood-stock', { method: 'GET' }),
+};
+
+export const transferAPI = {
+    // Hospital sends request to org
+    createRequest: (data) => apiCall('/api/transfer/request', { method: 'POST', body: JSON.stringify(data) }),
+    // Org checks stock for a request
+    checkStock: (id) => apiCall(`/api/transfer/check-stock/${id}`, { method: 'GET' }),
+    // Org approve/reject
+    orgApprove: (id, items) => apiCall(`/api/transfer/org-approve/${id}`, { method: 'POST', body: JSON.stringify({ items }) }),
+    orgReject: (id, reason) => apiCall(`/api/transfer/org-reject/${id}`, { method: 'POST', body: JSON.stringify({ reason }) }),
+    // Hospital confirm/reject
+    hospitalApprove: (id) => apiCall(`/api/transfer/hospital-approve/${id}`, { method: 'POST' }),
+    hospitalReject: (id, reason) => apiCall(`/api/transfer/hospital-reject/${id}`, { method: 'POST', body: JSON.stringify({ reason }) }),
+    // Admin finalise
+    adminApprove: (id) => apiCall(`/api/transfer/admin-approve/${id}`, { method: 'POST' }),
+    adminReject: (id, reason) => apiCall(`/api/transfer/admin-reject/${id}`, { method: 'POST', body: JSON.stringify({ reason }) }),
+    // Lists
+    getOrgTransfers: () => apiCall('/api/transfer/org', { method: 'GET' }),
+    getHospitalTransfers: () => apiCall('/api/transfer/hospital', { method: 'GET' }),
+    adminPending: () => apiCall('/api/transfer/admin/pending', { method: 'GET' }),
+};
+
+export { API_URL };
+export default { authAPI, inventoryAPI, donorAPI, publicAPI, adminAPI, organisationAPI, transferAPI };
+=======
 export default { authAPI, inventoryAPI, donorAPI, publicAPI, adminAPI };
+>>>>>>> 142ce276d2e571211da685c661614482fd0df331

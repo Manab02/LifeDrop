@@ -1,15 +1,26 @@
 {
+<<<<<<< HEAD
+    "version": 2,
+    "builds": [
+        {
+            "src": "server.js",
+=======
     "version": 3,
     "builds": [
         {
             "src": "index.js",
+>>>>>>> 142ce276d2e571211da685c661614482fd0df331
             "use": "@vercel/node"
         }
     ],
     "routes": [
         {
             "src": "/(.*)",
+<<<<<<< HEAD
+            "dest": "/server.js"
+=======
             "dest": "/index.js"
+>>>>>>> 142ce276d2e571211da685c661614482fd0df331
         }
     ]
 }

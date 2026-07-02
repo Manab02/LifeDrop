@@ -1,4 +1,3 @@
-
 import express from "express";
 import userModel from "../models/userModels.js";
 import inventoryModels from "../models/inventoryModels.js";
@@ -1220,6 +1219,76 @@ router.post('/reject-transaction/:transactionId', userAuth, isAdmin, async (req,
             success: false,
             message: error.message
         });
+    }
+});
+
+// Blood stock breakdown per org/hospital for a given blood group
+router.get('/blood-stock-breakdown/:bloodGroup', userAuth, isAdmin, async (req, res) => {
+    try {
+        const { bloodGroup } = req.params;
+        const inventory = await inventoryModel.find({
+            bloodGroup,
+            status: { $ne: 'expired' },
+            expiryDate: { $gt: new Date() }
+        }).populate('organisation', 'organisationName email')
+            .populate('hospital', 'hospitalName email');
+
+        // Per-org net stock
+        const orgMap = {};
+        const hospMap = {};
+
+        inventory.forEach(item => {
+            const delta = item.inventoryType === 'in' ? item.quantity : -item.quantity;
+            if (item.organisation) {
+                const key = item.organisation._id.toString();
+                if (!orgMap[key]) orgMap[key] = { name: item.organisation.organisationName, email: item.organisation.email, stock: 0 };
+                orgMap[key].stock += delta;
+            }
+            if (item.hospital) {
+                const key = item.hospital._id.toString();
+                if (!hospMap[key]) hospMap[key] = { name: item.hospital.hospitalName, email: item.hospital.email, stock: 0 };
+                hospMap[key].stock += delta;
+            }
+        });
+
+        const orgs = Object.values(orgMap).filter(o => o.stock > 0).sort((a, b) => b.stock - a.stock);
+        const hosps = Object.values(hospMap).filter(h => h.stock > 0).sort((a, b) => b.stock - a.stock);
+        const total = [...orgs, ...hosps].reduce((s, x) => s + x.stock, 0);
+
+        return res.json({ success: true, bloodGroup, orgs, hospitals: hosps, total });
+    } catch (error) {
+        return res.json({ success: false, message: error.message });
+    }
+});
+
+// Blood group breakdown by org/hospital
+router.get('/blood-group-details/:group', userAuth, isAdmin, async (req, res) => {
+    try {
+        const { group } = req.params;
+        const inventory = await inventoryModels.find({ bloodGroup: group, status: { $ne: 'expired' }, expiryDate: { $gt: new Date() } })
+            .populate('organisation', 'organisationName')
+            .populate('hospital', 'hospitalName');
+
+        // Build net per entity
+        const entityMap = {};
+        inventory.forEach(item => {
+            const entity = item.organisation || item.hospital;
+            if (!entity) return;
+            const id = entity._id.toString();
+            const name = entity.organisationName || entity.hospitalName || 'Unknown';
+            const type = item.organisation ? 'organisation' : 'hospital';
+            if (!entityMap[id]) entityMap[id] = { name, type, net: 0 };
+            entityMap[id].net += item.inventoryType === 'in' ? item.quantity : -item.quantity;
+        });
+
+        const details = Object.values(entityMap)
+            .map(e => ({ ...e, net: Math.max(0, e.net) }))
+            .filter(e => e.net > 0)
+            .sort((a, b) => b.net - a.net);
+
+        return res.json({ success: true, details });
+    } catch (error) {
+        return res.json({ success: false, message: error.message });
     }
 });
 

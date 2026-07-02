@@ -1,7 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Eye, EyeOff, Mail, RefreshCw, User } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+<<<<<<< HEAD
+import { authAPI, API_URL } from '../services/api';
+=======
 import { authAPI } from '../services/api';
+>>>>>>> 142ce276d2e571211da685c661614482fd0df331
 
 const Login = () => {
   const navigate = useNavigate();
@@ -234,7 +238,11 @@ const Login = () => {
             <div className="flex justify-center">
               <button
                 type="button"
+<<<<<<< HEAD
+                onClick={() => window.location.href = `${API_URL}/api/auth/google`}
+=======
                 onClick={() => window.location.href = `${import.meta.env.VITE_API_URL || 'http://localhost:7000'}/api/auth/google`}
+>>>>>>> 142ce276d2e571211da685c661614482fd0df331
                 className="flex items-center gap-3 border border-gray-300 rounded-full px-6 py-2 hover:bg-gray-50 transition font-medium text-gray-700"
               >
                 <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/google/google-original.svg" alt="Google" className="w-5 h-5" />

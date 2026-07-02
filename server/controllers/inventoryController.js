@@ -42,7 +42,11 @@ export const createInventory = async (req, res) => {
             isManualEntry
         } = req.body;
 
+<<<<<<< HEAD
+
+=======
     
+>>>>>>> 142ce276d2e571211da685c661614482fd0df331
         if (!bloodGroup) {
             console.log(' Missing blood group');
             return res.json({
@@ -67,7 +71,11 @@ export const createInventory = async (req, res) => {
             });
         }
 
+<<<<<<< HEAD
+
+=======
         
+>>>>>>> 142ce276d2e571211da685c661614482fd0df331
         const expiryDateObj = new Date(expiryDate);
         if (expiryDateObj <= new Date()) {
             console.log(' Expiry date in past');
@@ -77,27 +85,47 @@ export const createInventory = async (req, res) => {
             });
         }
 
+<<<<<<< HEAD
+
+        let finalInventoryType = inventoryType;
+
+        if (!finalInventoryType) {
+
+=======
         
         let finalInventoryType = inventoryType;
 
         if (!finalInventoryType) {
             
+>>>>>>> 142ce276d2e571211da685c661614482fd0df331
             if (donor || email) {
                 finalInventoryType = 'in';
                 console.log('Auto-detected inventoryType: IN (donor donation)');
             }
+<<<<<<< HEAD
+
+=======
         
+>>>>>>> 142ce276d2e571211da685c661614482fd0df331
             else if (hospital) {
                 finalInventoryType = 'out';
                 console.log('Auto-detected inventoryType: OUT (hospital request)');
             }
+<<<<<<< HEAD
+
+=======
             
+>>>>>>> 142ce276d2e571211da685c661614482fd0df331
             else if (organisation) {
                 finalInventoryType = 'in';
                 console.log('Auto-detected inventoryType: IN (organisation collection)');
             }
             else {
+<<<<<<< HEAD
+
+=======
                 
+>>>>>>> 142ce276d2e571211da685c661614482fd0df331
                 finalInventoryType = 'in';
                 console.log('Defaulting to inventoryType: IN');
             }
@@ -280,7 +308,18 @@ export const getInventoryController = async (req, res) => {
         if (user.role === 'organisation') {
             query.organisation = req.body.userId;
         } else if (user.role === 'hospital') {
+<<<<<<< HEAD
+            // Exclude org-side OUT records that just reference the hospital
+            query = {
+                hospital: req.body.userId,
+                $or: [
+                    { inventoryType: 'in' },
+                    { inventoryType: 'out', source_type: { $in: ['hospital', 'patient', 'manual', null] } }
+                ]
+            };
+=======
             query.hospital = req.body.userId;
+>>>>>>> 142ce276d2e571211da685c661614482fd0df331
         } else if (user.role === 'donor') {
             query.donor = req.body.userId;
         } else if (user.role === 'admin') {
@@ -750,4 +789,41 @@ export default {
     updateInventory,
     approveTransaction,
     rejectTransaction
+<<<<<<< HEAD
+};
+
+// Walk-in / unregistered donor donation (exported separately for route use)
+export const createWalkinDonation = async (req, res) => {
+    try {
+        const { donorName, campName, bloodGroup, quantity, expiryDate, organisation } = req.body;
+        if (!donorName || !bloodGroup || !quantity || !expiryDate)
+            return res.json({ success: false, message: 'Donor name, blood group, quantity and expiry date are required' });
+        const expiryDateObj = new Date(expiryDate);
+        if (expiryDateObj <= new Date())
+            return res.json({ success: false, message: 'Expiry date must be in the future' });
+        let orgUser = null;
+        if (organisation) {
+            orgUser = await userModel.findOne({ $or: [{ email: organisation }, { _id: organisation }], role: 'organisation' });
+        }
+        if (!orgUser) orgUser = await userModel.findById(req.body.userId);
+
+        const inventory = await inventoryModels.create({
+            inventoryType: 'in',
+            bloodGroup,
+            quantity: parseInt(quantity),
+            expiryDate: expiryDateObj,
+            source_name: donorName,
+            source_type: 'donor',
+            notes: campName || '',
+            organisation: orgUser?._id || null,
+            donor: null,
+            verified: false,
+            status: 'completed'
+        });
+        return res.json({ success: true, message: 'Walk-in donation recorded successfully', inventory });
+    } catch (error) {
+        return res.json({ success: false, message: error.message });
+    }
+=======
+>>>>>>> 142ce276d2e571211da685c661614482fd0df331
 };
