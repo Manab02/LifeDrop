@@ -1,30 +1,14 @@
 import userModel from "../models/userModels.js";
-<<<<<<< HEAD
 import inventoryModels from "../models/inventoryModels.js";
 import campModel from "../models/campModel.js";
-=======
-import inventoryModels from "../models/inventoryModels.js"
->>>>>>> 142ce276d2e571211da685c661614482fd0df331
 
 export const getOrganisationProfile = async (req, res) => {
     try {
         const organisation = await userModel.findById(req.body.userId).select('-password');
-<<<<<<< HEAD
         if (!organisation || organisation.role !== 'organisation') {
             return res.json({ success: false, message: 'Organisation not found' });
         }
         return res.json({ success: true, organisation });
-=======
-
-        if (!organisation || organisation.role !== 'organisation') {
-            return res.json({ success: false, message: 'Organisation not found' });
-        }
-
-        return res.json({
-            success: true,
-            organisation: organisation
-        });
->>>>>>> 142ce276d2e571211da685c661614482fd0df331
     } catch (error) {
         return res.json({ success: false, message: error.message });
     }
@@ -33,7 +17,6 @@ export const getOrganisationProfile = async (req, res) => {
 export const updateOrganisationProfile = async (req, res) => {
     try {
         const { organisationName, phone, email, state, district, city } = req.body;
-<<<<<<< HEAD
         const organisation = await userModel.findById(req.body.userId);
         if (!organisation || organisation.role !== 'organisation') {
             return res.json({ success: false, message: 'Organisation not found' });
@@ -41,24 +24,6 @@ export const updateOrganisationProfile = async (req, res) => {
         if (!organisation.isAccountVerified) {
             return res.json({ success: false, message: 'Your account is pending admin approval. You cannot edit details yet.' });
         }
-=======
-
-        const organisation = await userModel.findById(req.body.userId);
-
-        if (!organisation || organisation.role !== 'organisation') {
-            return res.json({ success: false, message: 'Organisation not found' });
-        }
-
-        
-        if (!organisation.isAccountVerified) {
-            return res.json({
-                success: false,
-                message: 'Your account is pending admin approval. You cannot edit details yet.'
-            });
-        }
-
-        
->>>>>>> 142ce276d2e571211da685c661614482fd0df331
         if (organisationName) organisation.organisationName = organisationName;
         if (phone) organisation.phone = phone;
         if (email) organisation.email = email;
@@ -69,25 +34,13 @@ export const updateOrganisationProfile = async (req, res) => {
                 city: city || organisation.address?.city
             };
         }
-<<<<<<< HEAD
         await organisation.save();
         return res.json({ success: true, message: 'Profile updated successfully', organisation });
-=======
-
-        await organisation.save();
-
-        return res.json({
-            success: true,
-            message: 'Profile updated successfully',
-            organisation: organisation
-        });
->>>>>>> 142ce276d2e571211da685c661614482fd0df331
     } catch (error) {
         return res.json({ success: false, message: error.message });
     }
 };
 
-<<<<<<< HEAD
 export const getOrganisationBloodStock = async (req, res) => {
     try {
         const organisation = await userModel.findById(req.body.userId);
@@ -242,50 +195,6 @@ export const getOrgDonors = async (req, res) => {
         });
 
         return res.json({ success: true, donors: Object.values(donorMap) });
-=======
-// GET blood stock for organisation
-export const getOrganisationBloodStock = async (req, res) => {
-    try {
-        const organisation = await userModel.findById(req.body.userId);
-
-        if (!organisation || organisation.role !== 'organisation') {
-            return res.json({ success: false, message: 'Organisation not found' });
-        }
-
-        if (!organisation.isAccountVerified) {
-            return res.json({
-                success: false,
-                message: 'Your account is pending admin approval.'
-            });
-        }
-
-        
-        const inventory = await inventoryModels.find({
-            organisation: req.body.userId
-        }).populate('donor').populate('hospital');
-
-        
-        const bloodStock = {};
-        const bloodGroups = ['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'];
-
-        bloodGroups.forEach(group => {
-            bloodStock[group] = 0;
-        });
-
-        inventory.forEach(item => {
-            if (item.inventoryType === 'in') {
-                bloodStock[item.bloodGroup] += item.quantity;
-            } else if (item.inventoryType === 'out') {
-                bloodStock[item.bloodGroup] -= item.quantity;
-            }
-        });
-
-        return res.json({
-            success: true,
-            bloodStock: bloodStock,
-            inventory: inventory
-        });
->>>>>>> 142ce276d2e571211da685c661614482fd0df331
     } catch (error) {
         return res.json({ success: false, message: error.message });
     }

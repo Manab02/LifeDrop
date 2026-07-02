@@ -1,10 +1,7 @@
 import React, { useState, useEffect } from 'react';
-<<<<<<< HEAD
 import { API_URL } from '../services/api';
-=======
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:7000';
->>>>>>> 142ce276d2e571211da685c661614482fd0df331
 
 const FeedbackPage = () => {
     const [feedbacks, setFeedbacks] = useState([]);

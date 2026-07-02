@@ -4,11 +4,7 @@ const apiCall = async (endpoint, options = {}) => {
     try {
         const response = await fetch(`${API_URL}${endpoint}`, {
             ...options,
-<<<<<<< HEAD
-            credentials: 'include',
-=======
             credentials: 'include', 
->>>>>>> 142ce276d2e571211da685c661614482fd0df331
             headers: {
                 'Content-Type': 'application/json',
                 ...(options.headers || {}),
@@ -117,14 +113,11 @@ export const inventoryAPI = {
         method: 'PUT',
         body: JSON.stringify(updateData),
     }),
-<<<<<<< HEAD
 
     walkinDonation: (data) => apiCall('/api/inventory/walkin-donation', {
         method: 'POST',
         body: JSON.stringify(data),
     }),
-=======
->>>>>>> 142ce276d2e571211da685c661614482fd0df331
 };
 
 export const donorAPI = {
@@ -244,7 +237,6 @@ export const adminAPI = {
     }),
 };
 
-<<<<<<< HEAD
 export const organisationAPI = {
     getProfile: () => apiCall('/api/organisation/profile', { method: 'GET' }),
     getCamps: () => apiCall('/api/organisation/camps', { method: 'GET' }),
@@ -278,6 +270,3 @@ export const transferAPI = {
 
 export { API_URL };
 export default { authAPI, inventoryAPI, donorAPI, publicAPI, adminAPI, organisationAPI, transferAPI };
-=======
-export default { authAPI, inventoryAPI, donorAPI, publicAPI, adminAPI };
->>>>>>> 142ce276d2e571211da685c661614482fd0df331
