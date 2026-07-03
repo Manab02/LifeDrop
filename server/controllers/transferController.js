@@ -2,7 +2,7 @@ import transferModel from "../models/transferModel.js";
 import inventoryModels from "../models/inventoryModels.js";
 import userModel from "../models/userModels.js";
 
-// ── Helper: net stock for an org ────────────────────────────────
+// ── Helper: net stock for an org ─────────────────────────────────
 const getOrgStock = async (orgId) => {
     const inv = await inventoryModels.find({
         organisation: orgId,
@@ -17,55 +17,56 @@ const getOrgStock = async (orgId) => {
     return stock;
 };
 
-// ── Helper: create OUT (org) + IN (hospital) inventory records ──
+// ── Helper: create OUT (org) + IN (hospital) records ─────────────
 const createInventoryRecords = async (transfer) => {
     const records = [];
     for (const item of transfer.items) {
         const expiryDate = item.expiryDate || new Date(Date.now() + 42 * 86400000);
+        const orgId = transfer.organisation._id || transfer.organisation;
+        const hospId = transfer.hospital._id || transfer.hospital;
+
         const out = await inventoryModels.create({
             inventoryType: 'out',
             bloodGroup: item.bloodGroup,
             quantity: item.quantity,
             expiryDate,
-            organisation: transfer.organisation,
-            hospital: transfer.hospital,
+            organisation: orgId,
+            hospital: hospId,
             source_type: 'organisation',
-            source_id: transfer.organisation,
             target_type: 'hospital',
-            target_id: transfer.hospital,
             status: 'completed',
             verified: true,
-            notes: `Transfer ${transfer.transferId} — sent to hospital`
+            notes: `Transfer ${transfer.transferId}`
         });
         const inp = await inventoryModels.create({
             inventoryType: 'in',
             bloodGroup: item.bloodGroup,
             quantity: item.quantity,
             expiryDate,
-            hospital: transfer.hospital,
-            organisation: transfer.organisation,
+            hospital: hospId,
+            organisation: orgId,
             source_type: 'organisation',
-            source_id: transfer.organisation,
             target_type: 'hospital',
-            target_id: transfer.hospital,
             status: 'completed',
             verified: true,
-            notes: `Transfer ${transfer.transferId} — received from organisation`
+            notes: `Transfer ${transfer.transferId}`
         });
         records.push(out._id, inp._id);
     }
     return records;
 };
 
-// ── Org initiates transfer (org pushes blood to hospital directly) ─
+// ── 1. Org initiates transfer directly (no approval needed) ──────
 export const orgInitiateTransfer = async (req, res) => {
     try {
         const { hospitalId, items, notes } = req.body;
         const user = await userModel.findById(req.body.userId);
         if (!user || user.role !== 'organisation')
             return res.json({ success: false, message: 'Only organisations can initiate transfers' });
+
         if (!hospitalId || !items?.length)
             return res.json({ success: false, message: 'Hospital and blood items required' });
+
         const hospital = await userModel.findById(hospitalId);
         if (!hospital || hospital.role !== 'hospital')
             return res.json({ success: false, message: 'Hospital not found' });
@@ -80,54 +81,59 @@ export const orgInitiateTransfer = async (req, res) => {
                 return res.json({ success: false, message: `Insufficient ${item.bloodGroup}: have ${avail}, need ${item.quantity}` });
         }
 
-        // Create inventory records immediately — org-initiated = no approval needed
         const transfer = await transferModel.create({
             organisation: req.body.userId,
             hospital: hospitalId,
             items: items.map(i => ({ bloodGroup: i.bloodGroup, quantity: parseInt(i.quantity), expiryDate: new Date(i.expiryDate) })),
             notes: notes || '',
-            status: 'completed',
+            status: 'admin_approved',   // org-initiated = immediately finalised
             initiatedBy: 'organisation',
             orgApprovedBy: req.body.userId,
-            orgApprovedAt: new Date()
+            orgApprovedAt: new Date(),
+            adminApprovedBy: req.body.userId,
+            adminApprovedAt: new Date()
         });
 
         const records = await createInventoryRecords(transfer);
         transfer.inventoryRecords = records;
         await transfer.save();
-
         await transfer.populate('hospital', 'hospitalName email');
+
         return res.json({ success: true, message: 'Transfer completed. Blood stock updated on both dashboards.', transfer });
     } catch (error) {
         return res.json({ success: false, message: error.message });
     }
 };
 
-// ── 1. Hospital sends blood request to org ──────────────────────
+// ── 2. Hospital sends blood request to org ────────────────────────
 export const createRequest = async (req, res) => {
     try {
         const { organisationId, items, notes } = req.body;
         const user = await userModel.findById(req.body.userId);
         if (!user || user.role !== 'hospital')
             return res.json({ success: false, message: 'Only hospitals can send blood requests' });
+
         if (!organisationId || !items?.length)
             return res.json({ success: false, message: 'Organisation and blood items required' });
+
         const org = await userModel.findById(organisationId);
         if (!org || org.role !== 'organisation')
             return res.json({ success: false, message: 'Organisation not found' });
-        const cleanItems = items.map(i => ({ bloodGroup: i.bloodGroup, quantity: parseInt(i.quantity) }));
-        for (const item of cleanItems) {
+
+        for (const item of items) {
             if (!item.bloodGroup || !item.quantity || item.quantity < 1)
                 return res.json({ success: false, message: 'Each item needs a valid blood group and quantity' });
         }
+
         const transfer = await transferModel.create({
             organisation: organisationId,
             hospital: req.body.userId,
-            items: cleanItems,
+            items: items.map(i => ({ bloodGroup: i.bloodGroup, quantity: parseInt(i.quantity) })),
             notes: notes || '',
             status: 'requested',
             initiatedBy: 'hospital'
         });
+
         await transfer.populate('organisation', 'organisationName email');
         await transfer.populate('hospital', 'hospitalName email');
         return res.json({ success: true, message: 'Blood request sent to organisation.', transfer });
@@ -136,15 +142,17 @@ export const createRequest = async (req, res) => {
     }
 };
 
-// ── 2. Org checks stock for a specific request ──────────────────
+// ── 3. Org checks stock for a request ────────────────────────────
 export const checkRequestStock = async (req, res) => {
     try {
         const { transferId } = req.params;
         const user = await userModel.findById(req.body.userId);
         if (!user || user.role !== 'organisation')
             return res.json({ success: false, message: 'Organisation only' });
+
         const transfer = await transferModel.findById(transferId);
         if (!transfer) return res.json({ success: false, message: 'Request not found' });
+
         const stock = await getOrgStock(req.body.userId);
         const stockCheck = transfer.items.map(item => ({
             bloodGroup: item.bloodGroup,
@@ -159,8 +167,7 @@ export const checkRequestStock = async (req, res) => {
     }
 };
 
-// ── 3. Org approves → immediately creates inventory records ─────
-// No admin step needed for org-initiated or hospital-requested transfers
+// ── 4. Org approves hospital request → creates inventory immediately
 export const orgApproveRequest = async (req, res) => {
     try {
         const { transferId } = req.params;
@@ -168,12 +175,14 @@ export const orgApproveRequest = async (req, res) => {
         const user = await userModel.findById(req.body.userId);
         if (!user || user.role !== 'organisation')
             return res.json({ success: false, message: 'Organisation only' });
+
         const transfer = await transferModel.findById(transferId)
             .populate('organisation', 'organisationName')
             .populate('hospital', 'hospitalName');
         if (!transfer) return res.json({ success: false, message: 'Request not found' });
-        if (!['requested'].includes(transfer.status))
+        if (transfer.status !== 'requested')
             return res.json({ success: false, message: `Cannot approve — status is ${transfer.status}` });
+
         // Re-validate stock
         const stock = await getOrgStock(req.body.userId);
         for (const item of transfer.items) {
@@ -181,34 +190,30 @@ export const orgApproveRequest = async (req, res) => {
             if (avail < item.quantity)
                 return res.json({ success: false, message: `Insufficient ${item.bloodGroup}: need ${item.quantity}, have ${avail}` });
         }
-        // Merge expiry dates
-        if (items) {
-            transfer.items = transfer.items.map((item, idx) => ({
-                bloodGroup: item.bloodGroup,
-                quantity: item.quantity,
-                expiryDate: items[idx]?.expiryDate ? new Date(items[idx].expiryDate) : new Date(Date.now() + 42 * 86400000)
-            }));
-        } else {
-            transfer.items = transfer.items.map(item => ({
-                bloodGroup: item.bloodGroup,
-                quantity: item.quantity,
-                expiryDate: item.expiryDate || new Date(Date.now() + 42 * 86400000)
-            }));
-        }
-        // Create inventory records immediately
+
+        // Merge expiry dates from org's approval form
+        transfer.items = transfer.items.map((item, idx) => ({
+            bloodGroup: item.bloodGroup,
+            quantity: item.quantity,
+            expiryDate: items?.[idx]?.expiryDate ? new Date(items[idx].expiryDate) : new Date(Date.now() + 42 * 86400000)
+        }));
+
         const records = await createInventoryRecords(transfer);
-        transfer.status = 'completed';
+        transfer.status = 'admin_approved';   // completed
         transfer.orgApprovedBy = req.body.userId;
         transfer.orgApprovedAt = new Date();
+        transfer.adminApprovedBy = req.body.userId;
+        transfer.adminApprovedAt = new Date();
         transfer.inventoryRecords = records;
         await transfer.save();
+
         return res.json({ success: true, message: 'Transfer approved. Blood stock updated on both dashboards.', transfer });
     } catch (error) {
         return res.json({ success: false, message: error.message });
     }
 };
 
-// ── 4. Org rejects ──────────────────────────────────────────────
+// ── 5. Org rejects hospital request ──────────────────────────────
 export const orgRejectRequest = async (req, res) => {
     try {
         const { transferId } = req.params;
@@ -216,58 +221,66 @@ export const orgRejectRequest = async (req, res) => {
         const user = await userModel.findById(req.body.userId);
         if (!user || user.role !== 'organisation')
             return res.json({ success: false, message: 'Organisation only' });
+
         const transfer = await transferModel.findById(transferId);
         if (!transfer) return res.json({ success: false, message: 'Request not found' });
         if (transfer.status !== 'requested')
             return res.json({ success: false, message: `Cannot reject — status is ${transfer.status}` });
-        transfer.status = 'rejected';
+
+        transfer.status = 'org_rejected';
         transfer.orgRejectionReason = reason || 'Insufficient stock or other reason';
         await transfer.save();
-        return res.json({ success: true, message: 'Request rejected. Hospital has been notified.', transfer });
+
+        return res.json({ success: true, message: 'Request rejected.', transfer });
     } catch (error) {
         return res.json({ success: false, message: error.message });
     }
 };
 
-// ── 5. Admin can approve any stuck transfer ─────────────────────
+// ── 6. Admin approves any stuck/pending transfer ──────────────────
 export const adminApprove = async (req, res) => {
     try {
         const { transferId } = req.params;
         const user = await userModel.findById(req.body.userId);
         if (!user || user.role !== 'admin')
             return res.json({ success: false, message: 'Admin only' });
+
         const transfer = await transferModel.findById(transferId)
             .populate('organisation', 'organisationName')
             .populate('hospital', 'hospitalName');
         if (!transfer) return res.json({ success: false, message: 'Transfer not found' });
-        if (transfer.status === 'completed')
+        if (transfer.status === 'admin_approved')
             return res.json({ success: false, message: 'Transfer already completed' });
-        // Final stock check
+
+        // Stock check
         const stock = await getOrgStock(transfer.organisation._id);
         for (const item of transfer.items) {
             const avail = stock[item.bloodGroup] || 0;
             if (avail < item.quantity)
-                return res.json({ success: false, message: `Insufficient ${item.bloodGroup} in org: need ${item.quantity}, have ${avail}` });
+                return res.json({ success: false, message: `Insufficient ${item.bloodGroup}: need ${item.quantity}, have ${avail}` });
         }
-        // Ensure items have expiry
+
+        // Add default expiry if missing
         transfer.items = transfer.items.map(item => ({
             bloodGroup: item.bloodGroup,
             quantity: item.quantity,
             expiryDate: item.expiryDate || new Date(Date.now() + 42 * 86400000)
         }));
+
         const records = await createInventoryRecords(transfer);
-        transfer.status = 'completed';
+        transfer.status = 'admin_approved';
         transfer.adminApprovedBy = req.body.userId;
         transfer.adminApprovedAt = new Date();
         transfer.inventoryRecords = records;
         await transfer.save();
-        return res.json({ success: true, message: 'Transfer completed by admin. Stock updated.', transfer });
+
+        return res.json({ success: true, message: 'Transfer approved by admin. Stock updated on both dashboards.', transfer });
     } catch (error) {
         return res.json({ success: false, message: error.message });
     }
 };
 
-// ── 6. Admin rejects ────────────────────────────────────────────
+// ── 7. Admin rejects ─────────────────────────────────────────────
 export const adminReject = async (req, res) => {
     try {
         const { transferId } = req.params;
@@ -275,23 +288,25 @@ export const adminReject = async (req, res) => {
         const user = await userModel.findById(req.body.userId);
         if (!user || user.role !== 'admin')
             return res.json({ success: false, message: 'Admin only' });
+
         const transfer = await transferModel.findById(transferId);
         if (!transfer) return res.json({ success: false, message: 'Transfer not found' });
-        transfer.status = 'rejected';
+
+        transfer.status = 'admin_rejected';
         transfer.adminRejectionReason = reason || 'Rejected by admin';
         await transfer.save();
+
         return res.json({ success: true, message: 'Transfer rejected by admin.', transfer });
     } catch (error) {
         return res.json({ success: false, message: error.message });
     }
 };
 
-// ── GET: transfers for org ──────────────────────────────────────
+// ── GET: transfers for org ────────────────────────────────────────
 export const getOrgTransfers = async (req, res) => {
     try {
         const transfers = await transferModel.find({ organisation: req.body.userId })
             .populate('hospital', 'hospitalName email')
-            .populate('orgApprovedBy', 'name organisationName')
             .sort({ createdAt: -1 });
         return res.json({ success: true, transfers });
     } catch (error) {
@@ -299,7 +314,7 @@ export const getOrgTransfers = async (req, res) => {
     }
 };
 
-// ── GET: transfers for hospital ─────────────────────────────────
+// ── GET: transfers for hospital ───────────────────────────────────
 export const getHospitalTransfers = async (req, res) => {
     try {
         const transfers = await transferModel.find({ hospital: req.body.userId })
@@ -311,16 +326,20 @@ export const getHospitalTransfers = async (req, res) => {
     }
 };
 
-// ── GET: admin — all non-completed transfers ────────────────────
+// ── GET: admin — all non-completed transfers ──────────────────────
 export const getAllPendingTransfers = async (req, res) => {
     try {
         const user = await userModel.findById(req.body.userId);
         if (!user || user.role !== 'admin')
             return res.json({ success: false, message: 'Admin only' });
-        const transfers = await transferModel.find({ status: { $in: ['requested', 'rejected'] } })
+
+        const transfers = await transferModel.find({
+            status: { $in: ['requested', 'org_rejected', 'hospital_rejected'] }
+        })
             .populate('organisation', 'organisationName email')
             .populate('hospital', 'hospitalName email')
             .sort({ createdAt: -1 });
+
         return res.json({ success: true, transfers });
     } catch (error) {
         return res.json({ success: false, message: error.message });

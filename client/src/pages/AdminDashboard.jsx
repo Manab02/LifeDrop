@@ -730,131 +730,54 @@ const AdminDashboard = () => {
               </div>
             )}
 
-            {/* Pending Transactions Tab */}
+            {/* Pending Blood Transfers — Admin steps in */}
             {activeTab === 'pending' && (
               <div className="bg-white rounded-xl shadow-lg p-6">
-                <h2 className="text-2xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+                <h2 className="text-2xl font-bold text-gray-800 mb-2 flex items-center gap-2">
                   <Clock className="w-6 h-6 text-blue-600" />
-                  Pending Transactions ({pendingTransactions.length})
+                  Pending Blood Transfers
+                  {pendingTransfers.length > 0 && <span className="ml-2 bg-red-100 text-red-700 text-sm px-2 py-0.5 rounded-full font-semibold">{pendingTransfers.length}</span>}
                 </h2>
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-                  <p className="text-sm text-blue-800">
-                    <strong>ℹ️ Note:</strong> These transactions are waiting for approval from hospitals or admin.
-                  </p>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead className="bg-gray-100">
-                      <tr>
-                        <th className="p-3 text-left text-sm">Transaction ID</th>
-                        <th className="p-3 text-left text-sm">Blood Group</th>
-                        <th className="p-3 text-left text-sm">Quantity</th>
-                        <th className="p-3 text-left text-sm">From</th>
-                        <th className="p-3 text-left text-sm">To</th>
-                        {showIDs && <th className="p-3 text-left text-sm">System IDs</th>}
-                        <th className="p-3 text-left text-sm">Expiry</th>
-                        <th className="p-3 text-left text-sm">Date</th>
-                        <th className="p-3 text-left text-sm">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {pendingTransactions.map((item, idx) => (
-                        <tr key={item._id} className={idx % 2 === 0 ? 'bg-gray-50' : ''}>
-                          <td className="p-3 text-xs font-mono text-blue-600 cursor-pointer hover:underline" onClick={() => handleViewTransaction(item.transactionId)}>
-                            {item.transactionId}
-                          </td>
-                          <td className="p-3 font-bold text-red-600">{item.bloodGroup}</td>
-                          <td className="p-3">{item.quantity}</td>
-                          <td className="p-3 text-sm">
-                            {item.source_id?.organisationName || item.organisation?.organisationName || 'N/A'}
-                          </td>
-                          <td className="p-3 text-sm">
-                            {item.target_id?.hospitalName || item.hospital?.hospitalName || 'N/A'}
-                          </td>
-                          {showIDs && (
-                            <td className="p-3 text-xs text-gray-600">
-                              {item.source_id?.systemId || item.organisation?.systemId} → {item.target_id?.systemId || item.hospital?.systemId}
-                            </td>
-                          )}
-                          <td className="p-3 text-sm">{new Date(item.expiryDate).toLocaleDateString()}</td>
-                          <td className="p-3 text-xs text-gray-600">{new Date(item.createdAt).toLocaleDateString()}</td>
-                          <td className="p-3">
-                            <div className="flex gap-2">
-                              <button
-                                onClick={() => handleApproveTransaction(item.transactionId)}
-                                className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 text-xs flex items-center gap-1"
-                              >
-                                <CheckCircle className="w-3 h-3" />
-                                Approve
-                              </button>
-                              <button
-                                onClick={() => handleRejectTransaction(item.transactionId)}
-                                className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-xs flex items-center gap-1"
-                              >
-                                <XCircle className="w-3 h-3" />
-                                Reject
-                              </button>
-                              <button
-                                onClick={() => handleViewTransaction(item.transactionId)}
-                                className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-xs"
-                              >
-                                View
-                              </button>
+                <p className="text-sm text-gray-500 mb-5">
+                  These are organisation → hospital transfers awaiting action. Admin can approve or reject when org/hospital cannot act.
+                </p>
+                {pendingTransfers.length === 0 ? (
+                  <div className="bg-gray-50 rounded-lg p-12 text-center text-gray-500">
+                    <i className="fa fa-check-circle text-5xl text-green-300 mb-3 block"></i>
+                    <p className="font-semibold">No pending transfers</p>
+                    <p className="text-sm">All transfers have been processed</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {pendingTransfers.map(t => (
+                      <div key={t._id} className="bg-white rounded-lg border border-gray-200 shadow-sm p-5">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2 flex-wrap">
+                              <span className="text-xs font-bold bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full">{t.status.replace(/_/g, ' ').toUpperCase()}</span>
+                              <span className="text-xs text-gray-500 font-mono">{t.transferId}</span>
                             </div>
-                          </td>
-                        </tr>
-                      ))}
-                      {pendingTransactions.length === 0 && (
-                        <tr>
-                          <td colSpan={showIDs ? "9" : "8"} className="p-6 text-center text-gray-500">
-                            No pending transactions
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* Blood Transfers — Admin can step in */}
-                <div className="mt-8 pt-6 border-t border-gray-200">
-                  <h3 className="text-lg font-bold text-gray-800 mb-3 flex items-center gap-2">
-                    <i className="fa fa-exchange-alt text-purple-600"></i> Pending Blood Transfers
-                    {pendingTransfers.length > 0 && <span className="bg-purple-100 text-purple-700 text-sm px-2 py-0.5 rounded-full font-semibold">{pendingTransfers.length}</span>}
-                  </h3>
-                  <p className="text-sm text-gray-500 mb-4">Organisation → Hospital transfers that are pending. Admin can approve or reject when org/hospital can't act.</p>
-                  {pendingTransfers.length === 0 ? (
-                    <div className="bg-gray-50 rounded-lg p-8 text-center text-gray-500 text-sm">No pending transfers</div>
-                  ) : (
-                    <div className="space-y-3">
-                      {pendingTransfers.map(t => (
-                        <div key={t._id} className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
-                          <div className="flex items-start justify-between gap-4">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-2 flex-wrap">
-                                <span className="text-xs font-bold bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full">{t.status.replace(/_/g, ' ').toUpperCase()}</span>
-                                <span className="text-xs text-gray-500 font-mono">{t.transferId}</span>
-                              </div>
-                              <p className="text-sm font-semibold">Org: <span className="text-purple-700">{t.organisation?.organisationName}</span></p>
-                              <p className="text-sm font-semibold">Hospital: <span className="text-blue-700">{t.hospital?.hospitalName}</span></p>
-                              <div className="flex flex-wrap gap-2 mt-2">
-                                {t.items.map((item, idx) => (
-                                  <span key={idx} className="bg-red-50 border border-red-200 text-red-700 text-xs px-2 py-1 rounded font-semibold">
-                                    {item.bloodGroup}: {item.quantity} units
-                                  </span>
-                                ))}
-                              </div>
-                              <p className="text-xs text-gray-400 mt-1">{new Date(t.createdAt).toLocaleString()}</p>
+                            <p className="text-sm font-semibold text-gray-800">Organisation: <span className="text-purple-700">{t.organisation?.organisationName}</span></p>
+                            <p className="text-sm font-semibold text-gray-800">Hospital: <span className="text-blue-700">{t.hospital?.hospitalName}</span></p>
+                            <div className="flex flex-wrap gap-2 mt-2">
+                              {t.items.map((item, idx) => (
+                                <span key={idx} className="bg-red-50 border border-red-200 text-red-700 text-xs px-2 py-1 rounded font-semibold">
+                                  {item.bloodGroup}: {item.quantity} units
+                                </span>
+                              ))}
                             </div>
-                            <div className="flex flex-col gap-2 flex-shrink-0">
-                              <button onClick={() => handleAdminApproveTransfer(t._id)} className="px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 text-xs font-semibold">✅ Approve</button>
-                              <button onClick={() => setRejectTransferId(t._id)} className="px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 text-xs font-semibold">❌ Reject</button>
-                            </div>
+                            {t.notes && <p className="text-xs text-gray-500 mt-1">Notes: {t.notes}</p>}
+                            <p className="text-xs text-gray-400 mt-1">{new Date(t.createdAt).toLocaleString()}</p>
+                          </div>
+                          <div className="flex flex-col gap-2 flex-shrink-0">
+                            <button onClick={() => handleAdminApproveTransfer(t._id)} className="px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 text-xs font-semibold">✅ Approve</button>
+                            <button onClick={() => setRejectTransferId(t._id)} className="px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 text-xs font-semibold">❌ Reject</button>
                           </div>
                         </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
@@ -1555,4 +1478,4 @@ const AdminDashboard = () => {
   );
 };
 
-export default AdminDashboard;
+export default AdminDashboard;  
