@@ -47,7 +47,15 @@ export const getOrganisationBloodStock = async (req, res) => {
         if (!organisation || organisation.role !== 'organisation') {
             return res.json({ success: false, message: 'Organisation not found' });
         }
-        const inventory = await inventoryModels.find({ organisation: req.body.userId })
+        const inventory = await inventoryModels.find({
+            organisation: req.body.userId,
+            status: { $ne: 'expired' },
+            expiryDate: { $gt: new Date() },
+            $or: [
+                { inventoryType: 'out' },
+                { inventoryType: 'in', target_type: { $ne: 'hospital' } }
+            ]
+        })
             .populate('donor').populate('hospital');
         const bloodStock = {};
         const bloodGroups = ['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'];
@@ -56,6 +64,7 @@ export const getOrganisationBloodStock = async (req, res) => {
             if (item.inventoryType === 'in') bloodStock[item.bloodGroup] += item.quantity;
             else if (item.inventoryType === 'out') bloodStock[item.bloodGroup] -= item.quantity;
         });
+        Object.keys(bloodStock).forEach(g => { if (bloodStock[g] < 0) bloodStock[g] = 0; });
         return res.json({ success: true, bloodStock, inventory });
     } catch (error) {
         return res.json({ success: false, message: error.message });

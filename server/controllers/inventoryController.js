@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import inventoryModels from "../models/inventoryModels.js";
 import userModel from "../models/userModels.js";
 import auditLogModel from "../models/auditLogModel.js";
@@ -114,6 +115,8 @@ export const createInventory = async (req, res) => {
             hospitalNameText: hospitalNameText || '',
             organisationNameText: organisationNameText || '',
             notes: notes || '',
+            source_name: source_name || '',
+            target_name: target_name || '',
             verified: !isManualEntry,
             status: 'completed'
         };
@@ -121,8 +124,6 @@ export const createInventory = async (req, res) => {
             inventoryData.verified = false;
             inventoryData.source_type = 'manual';
             inventoryData.target_type = 'manual';
-            inventoryData.source_name = source_name || '';
-            inventoryData.target_name = target_name || '';
 
             const inventory = new inventoryModels(inventoryData);
             await inventory.save();
@@ -207,6 +208,23 @@ export const createInventory = async (req, res) => {
                 inventoryData.target_id = orgUser._id;
                 inventoryData.target_type = 'organisation';
             }
+
+            // A hospital crediting their own stock manually (e.g. after
+            // receiving a direct send from an org, or a walk-in donor at
+            // the hospital itself).
+            if (hospital) {
+                const hospitalQuery = mongoose.Types.ObjectId.isValid(hospital)
+                    ? { $or: [{ email: hospital }, { _id: hospital }], role: 'hospital' }
+                    : { email: hospital, role: 'hospital' };
+                const hospitalUser = await userModel.findOne(hospitalQuery);
+                if (!hospitalUser) {
+                    return res.json({ success: false, message: 'Hospital not found or invalid' });
+                }
+                inventoryData.hospital = hospitalUser._id;
+                inventoryData.target_id = hospitalUser._id;
+                inventoryData.target_type = 'hospital';
+                if (!inventoryData.source_type) inventoryData.source_type = orgUser ? 'organisation' : 'manual';
+            }
         }
         else if (finalInventoryType === "out") {
             if (hospital) {
@@ -278,7 +296,15 @@ export const getInventoryController = async (req, res) => {
         let query = {};
 
         if (user.role === 'organisation') {
-            query.organisation = req.body.userId;
+            // Exclude hospital-side IN records that just reference this organisation
+            // (that's the hospital's copy of a transfer we sent out — not our own inflow).
+            query = {
+                organisation: req.body.userId,
+                $or: [
+                    { inventoryType: 'out' },
+                    { inventoryType: 'in', target_type: { $ne: 'hospital' } }
+                ]
+            };
         } else if (user.role === 'hospital') {
             // Exclude org-side OUT records that just reference the hospital
             query = {
@@ -348,7 +374,11 @@ export const decreaseInventory = async (req, res) => {
             hospital: req.body.userId,
             bloodGroup: bloodGroup,
             status: { $ne: 'expired' },
-            expiryDate: { $gt: new Date() }
+            expiryDate: { $gt: new Date() },
+            $or: [
+                { inventoryType: 'in' },
+                { inventoryType: 'out', source_type: { $in: ['hospital', 'patient', 'manual', null] } }
+            ]
         }).sort({ expiryDate: 1 });
 
         let availableStock = 0;
@@ -424,9 +454,21 @@ export const getBloodStock = async (req, res) => {
         let query = {};
 
         if (user.role === 'organisation') {
-            query.organisation = req.body.userId;
+            query = {
+                organisation: req.body.userId,
+                $or: [
+                    { inventoryType: 'out' },
+                    { inventoryType: 'in', target_type: { $ne: 'hospital' } }
+                ]
+            };
         } else if (user.role === 'hospital') {
-            query.hospital = req.body.userId;
+            query = {
+                hospital: req.body.userId,
+                $or: [
+                    { inventoryType: 'in' },
+                    { inventoryType: 'out', source_type: { $in: ['hospital', 'patient', 'manual', null] } }
+                ]
+            };
         } else {
             return res.json({
                 success: false,
@@ -463,6 +505,8 @@ export const getBloodStock = async (req, res) => {
             }
         });
 
+        Object.keys(bloodStock).forEach(g => { if (bloodStock[g] < 0) bloodStock[g] = 0; });
+
         return res.json({
             success: true,
             bloodStock,
@@ -494,9 +538,21 @@ export const getInventoryStats = async (req, res) => {
         let query = {};
 
         if (user.role === 'organisation') {
-            query.organisation = req.body.userId;
+            query = {
+                organisation: req.body.userId,
+                $or: [
+                    { inventoryType: 'out' },
+                    { inventoryType: 'in', target_type: { $ne: 'hospital' } }
+                ]
+            };
         } else if (user.role === 'hospital') {
-            query.hospital = req.body.userId;
+            query = {
+                hospital: req.body.userId,
+                $or: [
+                    { inventoryType: 'in' },
+                    { inventoryType: 'out', source_type: { $in: ['hospital', 'patient', 'manual', null] } }
+                ]
+            };
         } else if (user.role === 'donor') {
             query.donor = req.body.userId;
         } else if (user.role === 'admin') {

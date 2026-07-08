@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Eye, EyeOff, Mail, RefreshCw, User } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { authAPI, API_URL } from '../services/api';
+import { authAPI } from '../services/api';
 
 const Login = () => {
   const navigate = useNavigate();
@@ -225,23 +225,6 @@ const Login = () => {
             >
               {loading ? 'Logging in...' : `Login as ${role.charAt(0).toUpperCase() + role.slice(1)}`}
             </button>
-            <div className="my-6 flex items-center justify-center">
-              <span className="h-px w-16 bg-gray-300"></span>
-              <span className="mx-3 text-gray-500 text-sm">or continue with</span>
-              <span className="h-px w-16 bg-gray-300"></span>
-            </div>
-
-            <div className="flex justify-center">
-              <button
-                type="button"
-                onClick={() => window.location.href = `${API_URL}/api/auth/google`}
-                onClick={() => window.location.href = `${import.meta.env.VITE_API_URL || 'http://localhost:7000'}/api/auth/google`}
-                className="flex items-center gap-3 border border-gray-300 rounded-full px-6 py-2 hover:bg-gray-50 transition font-medium text-gray-700"
-              >
-                <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/google/google-original.svg" alt="Google" className="w-5 h-5" />
-                Continue with Google
-              </button>
-            </div>
             <div className="text-center mt-6 text-sm">
               <p>
                 Don't have an account?{' '}

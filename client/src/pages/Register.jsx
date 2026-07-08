@@ -10,7 +10,7 @@ const Register = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [authorizeDisplay, setAuthorizeDisplay] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [document, setDocument] = useState(null); 
+  const [document, setDocument] = useState(null);
   const [states, setStates] = useState([]);
   const [districts, setDistricts] = useState([]);
   const [cities, setCities] = useState([]);
@@ -31,16 +31,14 @@ const Register = () => {
   });
 
   useEffect(() => {
-    if (formData.role === 'donor') {
-      fetch('/states.json')
-        .then(res => res.json())
-        .then(data => setStates(data))
-        .catch(err => console.error('Error loading states:', err));
-    }
-  }, [formData.role]);
+    fetch('/states.json')
+      .then(res => res.json())
+      .then(data => setStates(data))
+      .catch(err => console.error('Error loading states:', err));
+  }, []);
 
   useEffect(() => {
-    if (formData.state && formData.role === 'donor') {
+    if (formData.state) {
       fetch('/districts.json')
         .then(res => res.json())
         .then(data => {
@@ -52,10 +50,10 @@ const Register = () => {
     } else {
       setDistricts([]);
     }
-  }, [formData.state, formData.role]);
+  }, [formData.state]);
 
   useEffect(() => {
-    if (formData.district && formData.role === 'donor') {
+    if (formData.district) {
       fetch('/cities.json')
         .then(res => res.json())
         .then(data => {
@@ -68,7 +66,7 @@ const Register = () => {
     } else {
       setCities([]);
     }
-  }, [formData.district, formData.state, formData.role]);
+  }, [formData.district, formData.state]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -114,9 +112,15 @@ const Register = () => {
       } else if (formData.role === 'organisation') {
         submitData.append('organisationName', formData.organisationName);
         submitData.append('registrationDocument', document);
+        submitData.append('state', formData.state);
+        submitData.append('district', formData.district);
+        submitData.append('city', formData.city);
       } else if (formData.role === 'hospital') {
         submitData.append('hospitalName', formData.hospitalName);
         submitData.append('registrationDocument', document);
+        submitData.append('state', formData.state);
+        submitData.append('district', formData.district);
+        submitData.append('city', formData.city);
       }
 
       const data = await authAPI.registerWithDocument(submitData);
@@ -171,11 +175,6 @@ const Register = () => {
         <h1 className="text-3xl font-bold text-center text-gray-800 mb-2">
           Register as {formData.role.charAt(0).toUpperCase() + formData.role.slice(1)}
         </h1>
-        {(isHospital || isOrganisation) && (
-          <p className="text-center text-sm text-gray-600 mb-6">
-            ℹ️ You can add your address after admin approval
-          </p>
-        )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
@@ -318,6 +317,59 @@ const Register = () => {
             />
           )}
 
+          {/* Location Fields - for Donor, Hospital, and Organisation */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div>
+              <label className="block text-red-600 font-semibold mb-2">State *</label>
+              <select
+                name="state"
+                value={formData.state}
+                onChange={handleChange}
+                required
+                className="w-full px-4 py-3 border border-gray-300 rounded focus:ring-2 focus:ring-red-500 bg-white"
+              >
+                <option value="">Select State</option>
+                {states.map((s, i) => (
+                  <option key={i} value={s.state}>{s.state}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-red-600 font-semibold mb-2">District *</label>
+              <select
+                name="district"
+                value={formData.district}
+                onChange={handleChange}
+                required
+                disabled={!formData.state}
+                className="w-full px-4 py-3 border border-gray-300 rounded focus:ring-2 focus:ring-red-500 bg-white disabled:bg-gray-100"
+              >
+                <option value="">Select District</option>
+                {districts.map((d, i) => (
+                  <option key={i} value={d.DIST_name}>{d.DIST_name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-red-600 font-semibold mb-2">City *</label>
+              <select
+                name="city"
+                value={formData.city}
+                onChange={handleChange}
+                required
+                disabled={!formData.district}
+                className="w-full px-4 py-3 border border-gray-300 rounded focus:ring-2 focus:ring-red-500 bg-white disabled:bg-gray-100"
+              >
+                <option value="">Select City</option>
+                {cities.map((c, i) => (
+                  <option key={i} value={c}>{c}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
           {/* Donor-Specific Fields */}
           {isDonor && (
             <>
@@ -350,59 +402,6 @@ const Register = () => {
                     <option value="">Select Blood Group</option>
                     {["A+", "A-", "B+", "B-", "O+", "O-", "AB+", "AB-"].map(bg => (
                       <option key={bg} value={bg}>{bg}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* Location Fields - ONLY FOR DONORS */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div>
-                  <label className="block text-red-600 font-semibold mb-2">State *</label>
-                  <select
-                    name="state"
-                    value={formData.state}
-                    onChange={handleChange}
-                    required
-                    className="w-full px-4 py-3 border border-gray-300 rounded focus:ring-2 focus:ring-red-500 bg-white"
-                  >
-                    <option value="">Select State</option>
-                    {states.map((s, i) => (
-                      <option key={i} value={s.state}>{s.state}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-red-600 font-semibold mb-2">District *</label>
-                  <select
-                    name="district"
-                    value={formData.district}
-                    onChange={handleChange}
-                    required
-                    disabled={!formData.state}
-                    className="w-full px-4 py-3 border border-gray-300 rounded focus:ring-2 focus:ring-red-500 bg-white disabled:bg-gray-100"
-                  >
-                    <option value="">Select District</option>
-                    {districts.map((d, i) => (
-                      <option key={i} value={d.DIST_name}>{d.DIST_name}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-red-600 font-semibold mb-2">City *</label>
-                  <select
-                    name="city"
-                    value={formData.city}
-                    onChange={handleChange}
-                    required
-                    disabled={!formData.district}
-                    className="w-full px-4 py-3 border border-gray-300 rounded focus:ring-2 focus:ring-red-500 bg-white disabled:bg-gray-100"
-                  >
-                    <option value="">Select City</option>
-                    {cities.map((c, i) => (
-                      <option key={i} value={c}>{c}</option>
                     ))}
                   </select>
                 </div>

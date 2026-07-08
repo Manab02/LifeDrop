@@ -4,26 +4,19 @@ import { transferAPI } from '../services/api';
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:7000';
 const BLOOD_GROUPS = ['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'];
 
-const ManualAddInventoryModal = ({ show, onClose, onSuccess, userRole, userEmail, bloodStock = {}, organisations = [] }) => {
-    const [inventoryType, setInventoryType] = useState('in');
-    const [sourceNote, setSourceNote] = useState('');
-    // Multi-item for both IN and OUT
+const ManualAddInventoryModal = ({ show, onClose, onSuccess, userEmail, bloodStock = {} }) => {
     const [items, setItems] = useState([{ bloodGroup: '', quantity: '', expiryDate: '' }]);
     const [hospitalId, setHospitalId] = useState('');
     const [patientName, setPatientName] = useState('');
-    const [orgId, setOrgId] = useState('');
     const [notes, setNotes] = useState('');
     const [loading, setLoading] = useState(false);
     const [hospitals, setHospitals] = useState([]);
-    const [orgs, setOrgs] = useState([]);
 
     useEffect(() => {
         if (show) {
-            setInventoryType(userRole === 'hospital' ? 'out' : 'in');
             setItems([{ bloodGroup: '', quantity: '', expiryDate: '' }]);
-            setSourceNote(''); setHospitalId(''); setPatientName(''); setOrgId(''); setNotes('');
+            setHospitalId(''); setPatientName(''); setNotes('');
             fetchHospitals();
-            fetchOrgs();
         }
     }, [show]);
 
@@ -32,14 +25,6 @@ const ManualAddInventoryModal = ({ show, onClose, onSuccess, userRole, userEmail
             const res = await fetch(`${API_URL}/api/public/get-hospitals`);
             const data = await res.json();
             if (data.success) setHospitals(data.data || []);
-        } catch (_) { }
-    };
-
-    const fetchOrgs = async () => {
-        try {
-            const res = await fetch(`${API_URL}/api/public/get-organisations`);
-            const data = await res.json();
-            if (data.success) setOrgs(data.data || []);
         } catch (_) { }
     };
 
@@ -53,15 +38,14 @@ const ManualAddInventoryModal = ({ show, onClose, onSuccess, userRole, userEmail
     const getAvail = (bg) => Math.max(0, bloodStock[bg] || 0);
 
     const validateItems = () => {
+        if (!hospitalId) return 'Select a hospital to send to';
         for (const item of items) {
             if (!item.bloodGroup || !item.quantity || !item.expiryDate) return 'Fill all blood group fields';
             if (parseInt(item.quantity) < 1) return 'Quantity must be at least 1';
             if (new Date(item.expiryDate) <= new Date()) return 'Expiry date must be in future';
-            if (inventoryType === 'out') {
-                const avail = getAvail(item.bloodGroup);
-                if (avail === 0) return `No ${item.bloodGroup} stock available`;
-                if (parseInt(item.quantity) > avail) return `${item.bloodGroup}: only ${avail} units available`;
-            }
+            const avail = getAvail(item.bloodGroup);
+            if (avail === 0) return `No ${item.bloodGroup} stock available`;
+            if (parseInt(item.quantity) > avail) return `${item.bloodGroup}: only ${avail} units available`;
         }
         return null;
     };
@@ -73,37 +57,15 @@ const ManualAddInventoryModal = ({ show, onClose, onSuccess, userRole, userEmail
 
         setLoading(true);
         try {
-            if (inventoryType === 'out') {
-                // OUT = send as transfer request (pending approval)
-                if (!hospitalId && !orgId) { alert('Select a hospital or organisation to send to'); setLoading(false); return; }
-                const targetId = hospitalId || orgId;
-                const data = await transferAPI.create({ hospitalId: targetId, items, notes: notes || sourceNote });
-                if (data.success) {
-                    alert('Transfer request sent! Awaiting approval before stock is updated.');
-                    onSuccess(); onClose();
-                } else alert(data.message || 'Failed');
-            } else {
-                // IN = direct record (no approval needed for incoming)
-                for (const item of items) {
-                    const res = await fetch(`${API_URL}/api/inventory/create-inventory`, {
-                        method: 'POST', credentials: 'include',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            inventoryType: 'in',
-                            bloodGroup: item.bloodGroup,
-                            quantity: parseInt(item.quantity),
-                            expiryDate: item.expiryDate,
-                            organisation: userEmail,
-                            email: userEmail,
-                            notes: sourceNote || ''
-                        })
-                    });
-                    const data = await res.json();
-                    if (!data.success) { alert(data.message || 'Failed to add record'); setLoading(false); return; }
-                }
-                alert('Blood record(s) added successfully!');
+            const data = await transferAPI.create({
+                hospitalId,
+                items,
+                notes: notes || (patientName ? `For patient: ${patientName}` : '')
+            });
+            if (data.success) {
+                alert('✅ Sent! Your stock has decreased. The hospital has been notified to add their own record.');
                 onSuccess(); onClose();
-            }
+            } else alert(data.message || 'Failed');
         } catch (_) {
             alert('An error occurred');
         } finally {
@@ -113,27 +75,42 @@ const ManualAddInventoryModal = ({ show, onClose, onSuccess, userRole, userEmail
 
     if (!show) return null;
 
-    const anyOverStock = inventoryType === 'out' && items.some(i => i.bloodGroup && i.quantity && parseInt(i.quantity) > getAvail(i.bloodGroup));
+    const anyOverStock = items.some(i => i.bloodGroup && i.quantity && parseInt(i.quantity) > getAvail(i.bloodGroup));
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
                 <div className="bg-red-600 text-white px-6 py-4 rounded-t-xl flex items-center justify-between sticky top-0">
                     <h2 className="text-xl font-bold flex items-center gap-2">
-                        <i className="fa fa-plus-circle"></i> Add Blood Record
+                        <i className="fa fa-truck-medical"></i> Send Blood to Hospital
                     </h2>
                     <button onClick={onClose} className="hover:opacity-70"><i className="fa fa-times text-xl"></i></button>
                 </div>
 
                 <form onSubmit={handleSubmit} className="p-6 space-y-5">
-                    {/* Type selector */}
-                    <div>
-                        <label className="block text-gray-700 font-semibold mb-2">Record Type *</label>
-                        <select value={inventoryType} onChange={e => setInventoryType(e.target.value)} required
-                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:outline-none">
-                            <option value="in">📥 Blood Coming In (Donation)</option>
-                            <option value="out">📤 Blood Going Out (Transfer to Hospital)</option>
-                        </select>
+                    {/* Hospital + patient + notes */}
+                    <div className="bg-red-50 p-4 rounded-lg border border-red-200 space-y-3">
+                        <h3 className="font-semibold text-red-800">📤 Send To</h3>
+                        <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-1">Hospital <span className="text-gray-400 font-normal">(required)</span></label>
+                            <select value={hospitalId} onChange={e => setHospitalId(e.target.value)} required
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none text-sm">
+                                <option value="">-- Select Registered Hospital --</option>
+                                {hospitals.map(h => <option key={h._id} value={h._id}>{h.hospitalName}</option>)}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-1">Patient Name <span className="text-gray-400 font-normal">(optional)</span></label>
+                            <input type="text" value={patientName} onChange={e => setPatientName(e.target.value)}
+                                placeholder="Patient name"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none text-sm" />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-1">Notes <span className="text-gray-400 font-normal">(optional)</span></label>
+                            <input type="text" value={notes} onChange={e => setNotes(e.target.value)}
+                                placeholder="Any notes..."
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none text-sm" />
+                        </div>
                     </div>
 
                     {/* Blood items — multi */}
@@ -148,8 +125,8 @@ const ManualAddInventoryModal = ({ show, onClose, onSuccess, userRole, userEmail
                         <div className="space-y-3">
                             {items.map((item, idx) => {
                                 const avail = getAvail(item.bloodGroup);
-                                const over = item.bloodGroup && item.quantity && parseInt(item.quantity) > avail && inventoryType === 'out';
-                                const noStock = inventoryType === 'out' && item.bloodGroup && avail === 0;
+                                const over = item.bloodGroup && item.quantity && parseInt(item.quantity) > avail;
+                                const noStock = item.bloodGroup && avail === 0;
                                 return (
                                     <div key={idx} className={`rounded-lg p-3 border ${noStock ? 'bg-red-50 border-red-300' : over ? 'bg-orange-50 border-orange-300' : 'bg-gray-50 border-gray-200'}`}>
                                         <div className="grid grid-cols-3 gap-2">
@@ -159,7 +136,7 @@ const ManualAddInventoryModal = ({ show, onClose, onSuccess, userRole, userEmail
                                                 {BLOOD_GROUPS.map(g => <option key={g}>{g}</option>)}
                                             </select>
                                             <input type="number" placeholder="Units" value={item.quantity} min="1"
-                                                max={inventoryType === 'out' && item.bloodGroup ? avail : undefined}
+                                                max={item.bloodGroup ? avail : undefined}
                                                 onChange={e => updateItem(idx, 'quantity', e.target.value)}
                                                 className={`border rounded-lg px-2 py-2 text-sm outline-none focus:ring-2 focus:ring-red-500 ${over ? 'border-red-400 bg-red-50' : 'border-gray-300'}`} />
                                             <input type="date" value={item.expiryDate}
@@ -168,7 +145,7 @@ const ManualAddInventoryModal = ({ show, onClose, onSuccess, userRole, userEmail
                                                 className="border border-gray-300 rounded-lg px-2 py-2 text-sm outline-none focus:ring-2 focus:ring-red-500" />
                                         </div>
                                         <div className="flex items-center justify-between mt-1">
-                                            {inventoryType === 'out' && item.bloodGroup && (
+                                            {item.bloodGroup && (
                                                 <p className={`text-xs font-semibold ${noStock ? 'text-red-600' : over ? 'text-orange-600' : 'text-green-600'}`}>
                                                     {noStock ? `❌ No ${item.bloodGroup} stock` : over ? `⚠️ Max available: ${avail}` : `✅ Available: ${avail} units`}
                                                 </p>
@@ -186,51 +163,14 @@ const ManualAddInventoryModal = ({ show, onClose, onSuccess, userRole, userEmail
                         </div>
                     </div>
 
-                    {/* IN: source note */}
-                    {inventoryType === 'in' && (
-                        <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-                            <h3 className="font-semibold text-green-800 mb-2">📥 Source / Notes</h3>
-                            <textarea value={sourceNote} onChange={e => setSourceNote(e.target.value)}
-                                rows={2} placeholder="e.g. Collected from camp at City Hall, walk-in donor..."
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none resize-none text-sm" />
-                        </div>
-                    )}
-
-                    {/* OUT: hospital/org + patient */}
-                    {inventoryType === 'out' && (
-                        <div className="bg-red-50 p-4 rounded-lg border border-red-200 space-y-3">
-                            <h3 className="font-semibold text-red-800">📤 Send To</h3>
-                            <div>
-                                <label className="block text-sm font-semibold text-gray-700 mb-1">Hospital <span className="text-gray-400 font-normal">(required)</span></label>
-                                <select value={hospitalId} onChange={e => setHospitalId(e.target.value)}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none text-sm">
-                                    <option value="">-- Select Registered Hospital --</option>
-                                    {hospitals.map(h => <option key={h._id} value={h._id}>{h.hospitalName}</option>)}
-                                </select>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-semibold text-gray-700 mb-1">Patient Name <span className="text-gray-400 font-normal">(optional)</span></label>
-                                <input type="text" value={patientName} onChange={e => setPatientName(e.target.value)}
-                                    placeholder="Patient name"
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none text-sm" />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-semibold text-gray-700 mb-1">Notes <span className="text-gray-400 font-normal">(optional)</span></label>
-                                <input type="text" value={notes} onChange={e => setNotes(e.target.value)}
-                                    placeholder="Any notes..."
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none text-sm" />
-                            </div>
-                            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-2 text-xs text-yellow-800">
-                                <i className="fa fa-info-circle mr-1"></i> This creates a <strong>transfer request</strong>. Hospital must approve — stock updates only after approval.
-                            </div>
-                        </div>
-                    )}
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-2 text-xs text-yellow-800">
+                        <i className="fa fa-info-circle mr-1"></i> This completes immediately on your side — your stock decreases now. The hospital will be notified to add their own record.
+                    </div>
 
                     <div className="flex gap-3">
                         <button type="submit" disabled={loading || anyOverStock}
                             className="flex-1 bg-red-600 text-white py-3 rounded-lg font-semibold hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm">
-                            {loading ? <span><i className="fa fa-spinner fa-spin mr-1"></i>Saving...</span>
-                                : inventoryType === 'out' ? 'Send Transfer Request' : 'Add Record'}
+                            {loading ? <span><i className="fa fa-spinner fa-spin mr-1"></i>Sending...</span> : 'Send to Hospital'}
                         </button>
                         <button type="button" onClick={onClose} disabled={loading}
                             className="flex-1 bg-gray-200 text-gray-700 py-3 rounded-lg font-semibold hover:bg-gray-300 text-sm">Cancel</button>

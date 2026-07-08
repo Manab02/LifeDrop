@@ -74,7 +74,13 @@ export const getBloodStock = async (req, res) => {
         }
 
         const inventory = await inventoryModels.find({
-            hospital: req.body.userId
+            hospital: req.body.userId,
+            status: { $ne: 'expired' },
+            expiryDate: { $gt: new Date() },
+            $or: [
+                { inventoryType: 'in' },
+                { inventoryType: 'out', source_type: { $in: ['hospital', 'patient', 'manual', null] } }
+            ]
         }).populate('donor').populate('organisation');
 
         const bloodStock = {};
@@ -91,6 +97,8 @@ export const getBloodStock = async (req, res) => {
                 bloodStock[item.bloodGroup] -= item.quantity;
             }
         });
+
+        Object.keys(bloodStock).forEach(g => { if (bloodStock[g] < 0) bloodStock[g] = 0; });
 
         return res.json({
             success: true,

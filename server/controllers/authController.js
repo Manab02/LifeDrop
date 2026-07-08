@@ -9,7 +9,7 @@ export const register = async (req, res) => {
 
     const { email, password, role, name, organisationName, hospitalName, bloodtype, age, phone, state, district, city } = req.body;
 
-    
+
     if (!email || !password || !role || !phone) {
         console.log('Missing basic fields');
         return res.json({ success: false, message: 'Email, password, role, and phone are required!' });
@@ -20,14 +20,14 @@ export const register = async (req, res) => {
         return res.json({ success: false, message: 'Please provide all donor details!' });
     }
 
-    if (role === 'hospital' && !hospitalName) {
-        console.log(' Missing hospital name');
-        return res.json({ success: false, message: 'Please provide hospital name!' });
+    if (role === 'hospital' && (!hospitalName || !state || !district || !city)) {
+        console.log(' Missing hospital fields');
+        return res.json({ success: false, message: 'Please provide hospital name and location!' });
     }
 
-    if (role === 'organisation' && !organisationName) {
-        console.log(' Missing organisation name');
-        return res.json({ success: false, message: 'Please provide organisation name!' });
+    if (role === 'organisation' && (!organisationName || !state || !district || !city)) {
+        console.log(' Missing organisation fields');
+        return res.json({ success: false, message: 'Please provide organisation name and location!' });
     }
 
     if ((role === 'hospital' || role === 'organisation') && !req.file) {
@@ -65,10 +65,11 @@ export const register = async (req, res) => {
             userData.age = age;
             userData.address = { state, district, city };
             userData.isAvailable = true;
-            userData.approvalStatus = 'approved'; 
+            userData.approvalStatus = 'approved';
         } else if (role === 'organisation') {
             userData.organisationName = organisationName;
-            userData.approvalStatus = 'pending'; 
+            userData.address = { state, district, city };
+            userData.approvalStatus = 'pending';
 
             if (req.file) {
                 userData.registrationDocument = {
@@ -82,6 +83,7 @@ export const register = async (req, res) => {
             }
         } else if (role === 'hospital') {
             userData.hospitalName = hospitalName;
+            userData.address = { state, district, city };
             userData.approvalStatus = 'pending';
 
             if (req.file) {

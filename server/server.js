@@ -16,8 +16,6 @@ import organisationRouter from "./routes/organisationRoutes.js";
 import transferRouter from "./routes/transferRoutes.js";
 import fs from 'fs';
 import feedbackRouter from "./routes/feedbackRoutes.js";
-import passport from "passport";
-import "./config/passport.js";
 import { checkExpiredBlood } from './services/expiryService.js';
 
 
@@ -38,7 +36,6 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan('dev'));
 app.use(cookieParser());
-app.use(passport.initialize());
 
 // Serve uploaded files statically
 //app.use('/uploads', express.static(path.join(__dirname, 'uploads')));

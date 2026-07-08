@@ -239,6 +239,7 @@ export const adminAPI = {
 
 export const organisationAPI = {
     getProfile: () => apiCall('/api/organisation/profile', { method: 'GET' }),
+    updateProfile: (profileData) => apiCall('/api/organisation/profile', { method: 'PUT', body: JSON.stringify(profileData) }),
     getCamps: () => apiCall('/api/organisation/camps', { method: 'GET' }),
     createCamp: (data) => apiCall('/api/organisation/camps', { method: 'POST', body: JSON.stringify(data) }),
     updateCamp: (id, data) => apiCall(`/api/organisation/camps/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
@@ -248,7 +249,15 @@ export const organisationAPI = {
     getBloodStock: () => apiCall('/api/organisation/blood-stock', { method: 'GET' }),
 };
 
+export const hospitalAPI = {
+    getProfile: () => apiCall('/api/hospital/profile', { method: 'GET' }),
+    updateProfile: (profileData) => apiCall('/api/hospital/profile', { method: 'PUT', body: JSON.stringify(profileData) }),
+    getBloodStock: () => apiCall('/api/hospital/blood-stock', { method: 'GET' }),
+};
+
 export const transferAPI = {
+    // Org pushes blood directly to a hospital (immediate, no approval needed)
+    create: (data) => apiCall('/api/transfer/create', { method: 'POST', body: JSON.stringify(data) }),
     // Hospital sends request to org
     createRequest: (data) => apiCall('/api/transfer/request', { method: 'POST', body: JSON.stringify(data) }),
     // Org checks stock for a request
@@ -259,6 +268,7 @@ export const transferAPI = {
     // Hospital confirm/reject
     hospitalApprove: (id) => apiCall(`/api/transfer/hospital-approve/${id}`, { method: 'POST' }),
     hospitalReject: (id, reason) => apiCall(`/api/transfer/hospital-reject/${id}`, { method: 'POST', body: JSON.stringify({ reason }) }),
+    acknowledge: (id) => apiCall(`/api/transfer/acknowledge/${id}`, { method: 'POST' }),
     // Admin finalise
     adminApprove: (id) => apiCall(`/api/transfer/admin-approve/${id}`, { method: 'POST' }),
     adminReject: (id, reason) => apiCall(`/api/transfer/admin-reject/${id}`, { method: 'POST', body: JSON.stringify({ reason }) }),
@@ -269,4 +279,4 @@ export const transferAPI = {
 };
 
 export { API_URL };
-export default { authAPI, inventoryAPI, donorAPI, publicAPI, adminAPI, organisationAPI, transferAPI };
+export default { authAPI, inventoryAPI, donorAPI, publicAPI, adminAPI, organisationAPI, hospitalAPI, transferAPI };

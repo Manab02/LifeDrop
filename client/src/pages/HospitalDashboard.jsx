@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { authAPI, inventoryAPI, transferAPI } from '../services/api';
-import ManualAddInventoryModal from '../components/ManualAddInventoryModal';
+import { authAPI, inventoryAPI, transferAPI, hospitalAPI } from '../services/api';
 import EditInventoryModal from '../components/EditInventoryModal';
 
 const HospitalDashboard = () => {
     const navigate = useNavigate();
     const [user, setUser] = useState(null);
-    const [activeTab, setActiveTab] = useState('dashboard');
+    const [activeTab, setActiveTab] = useState(() => sessionStorage.getItem('hospital_active_tab') || 'dashboard');
+    useEffect(() => { sessionStorage.setItem('hospital_active_tab', activeTab); }, [activeTab]);
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [bloodStock, setBloodStock] = useState({});
     const [inventory, setInventory] = useState([]);
@@ -28,6 +28,17 @@ const HospitalDashboard = () => {
     const [rejectTransferId, setRejectTransferId] = useState(null);
     const [rejectReason, setRejectReason] = useState('');
     const [searchRecords, setSearchRecords] = useState('');
+
+    // ── Profile section state ────────────────────────────────────
+    const [profileForm, setProfileForm] = useState({ hospitalName: '', phone: '', state: '', district: '', city: '' });
+    const [profileStates, setProfileStates] = useState([]);
+    const [profileDistricts, setProfileDistricts] = useState([]);
+    const [profileCities, setProfileCities] = useState([]);
+    const [profileSaving, setProfileSaving] = useState(false);
+    const [profileMessage, setProfileMessage] = useState('');
+    const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '', confirmNewPassword: '' });
+    const [passwordSaving, setPasswordSaving] = useState(false);
+    const [passwordMessage, setPasswordMessage] = useState('');
     const [searchRequests, setSearchRequests] = useState('');
     const [showEditModal, setShowEditModal] = useState(false);
     const [selectedInventory, setSelectedInventory] = useState(null);
@@ -37,6 +48,12 @@ const HospitalDashboard = () => {
         quantity: '',
         notes: ''
     });
+    const [manualAddItems, setManualAddItems] = useState([{ bloodGroup: '', quantity: '', expiryDate: '' }]);
+    const [manualAddNotes, setManualAddNotes] = useState('');
+    const [manualAddSourceTransferId, setManualAddSourceTransferId] = useState(null);
+    const [manualAddSaving, setManualAddSaving] = useState(false);
+    const [recordsSubTab, setRecordsSubTab] = useState('in'); // 'in' | 'out'
+    const [transfersSubTab, setTransfersSubTab] = useState('pending'); // 'pending' | 'history'
 
     const [requestFormData, setRequestFormData] = useState({
         bloodGroup: '',
@@ -56,6 +73,7 @@ const HospitalDashboard = () => {
         if (user) {
             fetchInventory();
             fetchTransfers();
+            fetchHospitalProfile();
             fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:7000'}/api/public/get-organisations`)
                 .then(r => r.json()).then(d => { if (d.success) setOrgsForRequest(d.data || []); }).catch(() => { });
         }
@@ -67,16 +85,16 @@ const HospitalDashboard = () => {
     };
 
     const handleApproveTransfer = async (id) => {
-        if (!window.confirm('Confirm receipt of this blood transfer? This will proceed to admin for final approval.')) return;
+        if (!window.confirm('Confirm receipt of this blood transfer? Your stock will increase immediately.')) return;
         const data = await transferAPI.hospitalApprove(id);
-        if (data.success) { alert('Receipt confirmed! Awaiting admin finalisation.'); fetchTransfers(); fetchInventory(); }
+        if (data.success) { alert('✅ Receipt confirmed! Stock has been added to your inventory.'); fetchTransfers(); fetchInventory(); }
         else alert(data.message || 'Failed');
     };
 
     const handleRejectTransfer = async () => {
         if (!rejectReason.trim()) { alert('Please enter a rejection reason'); return; }
         const data = await transferAPI.hospitalReject(rejectTransferId, rejectReason);
-        if (data.success) { setRejectTransferId(null); setRejectReason(''); fetchTransfers(); }
+        if (data.success) { alert('Rejected. The organisation has been notified and their stock has been restored.'); setRejectTransferId(null); setRejectReason(''); fetchTransfers(); }
         else alert(data.message || 'Failed');
     };
 
@@ -387,6 +405,215 @@ const HospitalDashboard = () => {
         setShowEditModal(true);
     };
 
+    const openManualAddModal = (transfer = null) => {
+        if (transfer) {
+            setManualAddItems(transfer.items.map(i => ({
+                bloodGroup: i.bloodGroup,
+                quantity: String(i.quantity),
+                expiryDate: new Date(Date.now() + 42 * 86400000).toISOString().split('T')[0]
+            })));
+            setManualAddNotes(`Received from ${transfer.organisation?.organisationName || 'organisation'}${transfer.notes ? ' — ' + transfer.notes : ''}`);
+            setManualAddSourceTransferId(transfer._id);
+        } else {
+            setManualAddItems([{ bloodGroup: '', quantity: '', expiryDate: '' }]);
+            setManualAddNotes('');
+            setManualAddSourceTransferId(null);
+        }
+        setShowManualAddModal(true);
+    };
+
+    const updateManualAddItem = (idx, field, value) => {
+        setManualAddItems(prev => { const n = [...prev]; n[idx] = { ...n[idx], [field]: value }; return n; });
+    };
+    const addManualAddItem = () => setManualAddItems(prev => [...prev, { bloodGroup: '', quantity: '', expiryDate: '' }]);
+    const removeManualAddItem = (idx) => setManualAddItems(prev => prev.filter((_, i) => i !== idx));
+
+    const handleManualAddRecord = async (e) => {
+        e.preventDefault();
+        for (const item of manualAddItems) {
+            if (!item.bloodGroup || !item.quantity || !item.expiryDate) {
+                alert('Please fill all required fields for every blood group row');
+                return;
+            }
+        }
+        setManualAddSaving(true);
+        try {
+            for (const item of manualAddItems) {
+                const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:7000'}/api/inventory/create-inventory`, {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        inventoryType: 'in',
+                        bloodGroup: item.bloodGroup,
+                        quantity: parseInt(item.quantity),
+                        expiryDate: item.expiryDate,
+                        hospital: user?.email,
+                        notes: manualAddNotes || ''
+                    })
+                });
+                const data = await res.json();
+                if (!data.success) {
+                    alert(data.message || 'Failed to add record');
+                    setManualAddSaving(false);
+                    return;
+                }
+            }
+            // If this record was added from a "blood sent to you" notification, clear it from Pending
+            if (manualAddSourceTransferId) {
+                await transferAPI.acknowledge(manualAddSourceTransferId);
+            }
+            alert('✅ Record added! Your blood stock has increased.');
+            setShowManualAddModal(false);
+            setManualAddItems([{ bloodGroup: '', quantity: '', expiryDate: '' }]);
+            setManualAddNotes('');
+            setManualAddSourceTransferId(null);
+            fetchInventory();
+            fetchTransfers();
+        } catch (error) {
+            console.error('Manual add record error:', error);
+            alert('An error occurred');
+        } finally {
+            setManualAddSaving(false);
+        }
+    };
+
+    // ── Profile: fetch, cascading location lists, update, change password ──
+    const fetchHospitalProfile = async () => {
+        const data = await hospitalAPI.getProfile();
+        if (data.success && data.hospital) {
+            const h = data.hospital;
+            setProfileForm({
+                hospitalName: h.hospitalName || '',
+                phone: h.phone || '',
+                state: h.address?.state || '',
+                district: h.address?.district || '',
+                city: h.address?.city || ''
+            });
+        }
+    };
+
+    useEffect(() => {
+        fetch('/states.json').then(r => r.json()).then(setProfileStates).catch(() => { });
+    }, []);
+
+    useEffect(() => {
+        if (profileForm.state) {
+            fetch('/districts.json')
+                .then(r => r.json())
+                .then(data => setProfileDistricts(data.filter(d => d.state_name === profileForm.state)))
+                .catch(() => { });
+        } else {
+            setProfileDistricts([]);
+        }
+    }, [profileForm.state]);
+
+    useEffect(() => {
+        if (profileForm.district) {
+            fetch('/cities.json')
+                .then(r => r.json())
+                .then(data => {
+                    const stateObj = data.india.states.find(s => s.name === profileForm.state);
+                    const districtObj = stateObj?.districts.find(d => d.name === profileForm.district);
+                    setProfileCities(districtObj ? districtObj.cities : []);
+                })
+                .catch(() => { });
+        } else {
+            setProfileCities([]);
+        }
+    }, [profileForm.district, profileForm.state]);
+
+    const handleProfileChange = (e) => {
+        const { name, value } = e.target;
+        setProfileForm(prev => {
+            const next = { ...prev, [name]: value };
+            if (name === 'state') { next.district = ''; next.city = ''; }
+            if (name === 'district') { next.city = ''; }
+            return next;
+        });
+    };
+
+    const handleProfileSave = async (e) => {
+        e.preventDefault();
+        setProfileSaving(true);
+        setProfileMessage('');
+        try {
+            const data = await hospitalAPI.updateProfile(profileForm);
+            if (data.success) {
+                setProfileMessage('✅ Profile updated successfully');
+                const stored = JSON.parse(localStorage.getItem('user') || '{}');
+                localStorage.setItem('user', JSON.stringify({
+                    ...stored,
+                    hospitalName: profileForm.hospitalName,
+                    phone: profileForm.phone,
+                    address: { state: profileForm.state, district: profileForm.district, city: profileForm.city }
+                }));
+                fetchHospitalProfile();
+            } else {
+                setProfileMessage(data.message || 'Update failed');
+            }
+        } catch (error) {
+            setProfileMessage('An error occurred');
+        } finally {
+            setProfileSaving(false);
+        }
+    };
+
+    const handlePasswordChange = (e) => {
+        const { name, value } = e.target;
+        setPasswordForm(prev => ({ ...prev, [name]: value }));
+    };
+
+    const handlePasswordSave = async (e) => {
+        e.preventDefault();
+        if (passwordForm.newPassword !== passwordForm.confirmNewPassword) {
+            setPasswordMessage('New passwords do not match');
+            return;
+        }
+        if (passwordForm.newPassword.length < 6) {
+            setPasswordMessage('New password must be at least 6 characters');
+            return;
+        }
+        setPasswordSaving(true);
+        setPasswordMessage('');
+        try {
+            const data = await authAPI.changePassword({
+                currentPassword: passwordForm.currentPassword,
+                newPassword: passwordForm.newPassword
+            });
+            if (data.success) {
+                setPasswordMessage('✅ Password changed successfully');
+                setPasswordForm({ currentPassword: '', newPassword: '', confirmNewPassword: '' });
+            } else {
+                setPasswordMessage(data.message || 'Failed to change password');
+            }
+        } catch (error) {
+            setPasswordMessage('An error occurred');
+        } finally {
+            setPasswordSaving(false);
+        }
+    };
+
+    const handleAcknowledge = async (id) => {
+        const data = await transferAPI.acknowledge(id);
+        if (data.success) fetchTransfers();
+    };
+
+    const isTransferPending = (t) => {
+        const isPush = t.initiatedBy === 'organisation';
+        if (t.status === 'requested') return true;
+        if (t.status === 'org_approved' && !isPush) return true;
+        if (t.status === 'org_approved' && isPush && !t.hospitalAcknowledged) return true;
+        return false;
+    };
+
+    const handleTabChange = (tab) => {
+        setActiveTab(tab);
+        setSidebarOpen(false);
+        fetchInventory();
+        fetchTransfers();
+    };
+
     const handleLogout = async () => {
         try {
             await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:7000'}/api/auth/logout`, {
@@ -397,7 +624,7 @@ const HospitalDashboard = () => {
             console.error('Logout error:', error);
         }
         localStorage.removeItem('user');
-        navigate('/login');
+        window.location.replace('/login');
     };
 
     if (loading) {
@@ -425,45 +652,53 @@ const HospitalDashboard = () => {
 
                 <nav className="flex-1 p-4 space-y-2">
                     <button
-                        onClick={() => { setActiveTab('dashboard'); setSidebarOpen(false); }}
+                        onClick={() => handleTabChange('dashboard')}
                         className={`w-full flex items-center p-3 rounded-lg transition ${activeTab === 'dashboard' ? 'bg-red-600' : 'hover:bg-red-600'}`}
                     >
                         <i className="fa fa-gauge w-6"></i> Dashboard
                     </button>
                     <button
-                        onClick={() => { setActiveTab('requests'); setSidebarOpen(false); }}
+                        onClick={() => handleTabChange('requests')}
                         className={`w-full flex items-center p-3 rounded-lg transition ${activeTab === 'requests' ? 'bg-red-600' : 'hover:bg-red-600'}`}
                     >
                         <i className="fa fa-hand-holding-medical w-6"></i>
-                        Blood Requests ({allRequests.length})
+                        Blood Requests
                     </button>
                     <button
-                        onClick={() => { setActiveTab('stock'); setSidebarOpen(false); }}
+                        onClick={() => handleTabChange('stock')}
                         className={`w-full flex items-center p-3 rounded-lg transition ${activeTab === 'stock' ? 'bg-red-600' : 'hover:bg-red-600'}`}
                     >
                         <i className="fa fa-vial w-6"></i> Blood Stock
                     </button>
                     <button
-                        onClick={() => { setActiveTab('records'); setSidebarOpen(false); }}
+                        onClick={() => handleTabChange('records')}
                         className={`w-full flex items-center p-3 rounded-lg transition ${activeTab === 'records' ? 'bg-red-600' : 'hover:bg-red-600'}`}
                     >
-                        <i className="fa fa-list w-6"></i> All Records ({inventory.length})
+                        <i className="fa fa-list w-6"></i> All Records
                     </button>
                     <button
-                        onClick={() => { setActiveTab('transfers'); setSidebarOpen(false); }}
+                        onClick={() => handleTabChange('transfers')}
                         className={`w-full flex items-center justify-between p-3 rounded-lg transition ${activeTab === 'transfers' ? 'bg-red-600' : 'hover:bg-red-600'}`}
                     >
                         <span className="flex items-center gap-2"><i className="fa fa-exchange-alt w-6"></i> Pending Transfers</span>
-                        {transfers.filter(t => t.status === 'pending').length > 0 && (
-                            <span className="bg-white text-red-700 text-xs font-bold px-2 py-0.5 rounded-full">{transfers.filter(t => t.status === 'pending').length}</span>
+                        {transfers.filter(isTransferPending).length > 0 && (
+                            <span className="bg-white text-red-700 text-xs font-bold px-2 py-0.5 rounded-full">{transfers.filter(isTransferPending).length}</span>
                         )}
                     </button>
                     <button
-                        onClick={() => { setActiveTab('notifications'); setSidebarOpen(false); }}
-                        className={`w-full flex items-center p-3 rounded-lg transition ${activeTab === 'notifications' ? 'bg-red-600' : 'hover:bg-red-600'}`}
+                        onClick={() => handleTabChange('notifications')}
+                        className={`w-full flex items-center justify-between p-3 rounded-lg transition ${activeTab === 'notifications' ? 'bg-red-600' : 'hover:bg-red-600'}`}
                     >
-                        <i className="fa fa-bell w-6"></i>
-                        Notifications ({notifications.length})
+                        <span className="flex items-center gap-2"><i className="fa fa-bell w-6"></i> Notifications</span>
+                        {notifications.length > 0 && (
+                            <span className="bg-white text-red-700 text-xs font-bold px-2 py-0.5 rounded-full">{notifications.length}</span>
+                        )}
+                    </button>
+                    <button
+                        onClick={() => { handleTabChange('profile'); fetchHospitalProfile(); }}
+                        className={`w-full flex items-center p-3 rounded-lg transition ${activeTab === 'profile' ? 'bg-red-600' : 'hover:bg-red-600'}`}
+                    >
+                        <i className="fa fa-user-gear w-6"></i> Profile
                     </button>
                 </nav>
 
@@ -491,14 +726,6 @@ const HospitalDashboard = () => {
                         <h1 className="text-2xl font-semibold text-gray-800">
                             Welcome, <span className="text-red-600">{user?.name}</span>
                         </h1>
-                        <button
-                            onClick={fetchInventory}
-                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
-                            title="Refresh data"
-                        >
-                            <i className="fa fa-refresh"></i>
-                            Refresh
-                        </button>
                     </div>
 
                     {/* DASHBOARD TAB */}
@@ -559,7 +786,7 @@ const HospitalDashboard = () => {
                                         Request Blood
                                     </button>
                                     <button
-                                        onClick={() => setShowManualAddModal(true)}
+                                        onClick={() => openManualAddModal()}
                                         className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2 shadow-md hover:shadow-lg transition"
                                     >
                                         <i className="fa fa-plus"></i>
@@ -572,6 +799,32 @@ const HospitalDashboard = () => {
                                         <i className="fa fa-minus-circle"></i>
                                         Record Usage
                                     </button>
+                                </div>
+                            </div>
+
+                            {/* Blood Stock Overview — easy to see, click a group to jump to full Blood Stock tab */}
+                            <div className="mb-6">
+                                <h2 className="text-lg font-semibold mb-3 text-gray-700">Blood Stock Overview</h2>
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                                    {['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'].map(group => {
+                                        const qty = bloodStock[group]?.total || 0;
+                                        const isEmpty = qty === 0;
+                                        const isLow = !isEmpty && qty <= 5;
+                                        return (
+                                            <button
+                                                key={group}
+                                                onClick={() => handleTabChange('stock')}
+                                                className={`rounded-lg p-4 border-2 text-center shadow hover:shadow-md transition cursor-pointer ${isEmpty ? 'bg-red-50 border-red-300' : isLow ? 'bg-orange-50 border-orange-300' : 'bg-green-50 border-green-300'
+                                                    }`}
+                                            >
+                                                <div className="text-xl font-bold text-red-600">{group}</div>
+                                                <div className="text-2xl font-bold text-gray-800 mt-1">{qty}</div>
+                                                <div className="text-xs text-gray-500">units</div>
+                                                {isEmpty && <span className="inline-block mt-1 text-xs font-bold text-red-600">Empty</span>}
+                                                {isLow && <span className="inline-block mt-1 text-xs font-bold text-orange-600">Low</span>}
+                                            </button>
+                                        );
+                                    })}
                                 </div>
                             </div>
 
@@ -612,7 +865,7 @@ const HospitalDashboard = () => {
                                 <div className="flex items-center justify-between mb-3">
                                     <h2 className="text-lg font-semibold text-gray-700">Recent Records</h2>
                                     <button
-                                        onClick={() => setActiveTab('records')}
+                                        onClick={() => handleTabChange('records')}
                                         className="text-blue-600 hover:text-blue-800 text-sm font-semibold"
                                     >
                                         View All →
@@ -657,7 +910,7 @@ const HospitalDashboard = () => {
                                 <div className="flex items-center justify-between mb-3">
                                     <h2 className="text-lg font-semibold text-gray-700">Recent Notifications</h2>
                                     <button
-                                        onClick={() => setActiveTab('notifications')}
+                                        onClick={() => handleTabChange('notifications')}
                                         className="text-blue-600 hover:text-blue-800 text-sm font-semibold"
                                     >
                                         View All →
@@ -780,10 +1033,6 @@ const HospitalDashboard = () => {
                         <div>
                             <div className="flex items-center justify-between mb-4">
                                 <h2 className="text-xl font-bold text-gray-800">Blood Stock (Real-time)</h2>
-                                <div className="flex items-center gap-2 text-sm text-gray-600">
-                                    <i className="fa fa-sync-alt animate-spin"></i>
-                                    <span>Auto-refresh every 30 seconds</span>
-                                </div>
                             </div>
 
                             <div className="grid grid-cols-1 gap-6">
@@ -846,88 +1095,128 @@ const HospitalDashboard = () => {
                         </div>
                     )}
 
-                    {/* ALL RECORDS TAB */}
+                    {/* ALL RECORDS TAB — clickable IN / OUT toggle */}
                     {activeTab === 'records' && (
                         <div>
-                            <h2 className="text-xl font-bold mb-4 text-gray-800">All Inventory Records</h2>
-                            <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-                                <table className="w-full">
-                                    <thead className="bg-gray-100">
-                                        <tr>
-                                            <th className="p-3 text-left text-sm">Type</th>
-                                            <th className="p-3 text-left text-sm">Blood Group</th>
-                                            <th className="p-3 text-left text-sm">Quantity</th>
-                                            <th className="p-3 text-left text-sm">Source/Target</th>
-                                            <th className="p-3 text-left text-sm">Expiry Date</th>
-                                            <th className="p-3 text-left text-sm">Date</th>
-                                            <th className="p-3 text-left text-sm">Status</th>
-                                            <th className="p-3 text-left text-sm">Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {inventory.map((item) => {
-                                            const isExpired = item.status === 'expired' || new Date(item.expiryDate) < new Date();
-                                            const isExpiringSoon = !isExpired && new Date(item.expiryDate) < new Date(Date.now() + 5 * 24 * 60 * 60 * 1000);
-
-                                            return (
-                                                <tr key={item._id} className={`border-b hover:bg-gray-50 ${isExpired ? 'bg-red-50' : isExpiringSoon ? 'bg-orange-50' : ''}`}>
-                                                    <td className="p-3">
-                                                        <span className={`px-2 py-1 rounded text-xs font-semibold ${item.inventoryType === 'in' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                                                            {item.inventoryType?.toUpperCase()}
-                                                        </span>
-                                                    </td>
-                                                    <td className="p-3 text-red-600 font-bold">{item.bloodGroup}</td>
-                                                    <td className="p-3 font-semibold">{item.quantity}</td>
-                                                    <td className="p-3 text-sm">
-                                                        {item.donor?.name || item.organisation?.organisationName || item.source_name || item.target_name || 'N/A'}
-                                                    </td>
-                                                    <td className="p-3">
-                                                        <span className={isExpired ? 'text-red-600 font-bold' : isExpiringSoon ? 'text-orange-600 font-semibold' : 'text-gray-700'}>
-                                                            {new Date(item.expiryDate).toLocaleDateString()}
-                                                        </span>
-                                                    </td>
-                                                    <td className="p-3 text-sm">{new Date(item.createdAt).toLocaleDateString()}</td>
-                                                    <td className="p-3">
-                                                        <span className={`px-2 py-1 rounded text-xs font-semibold ${item.status === 'expired' ? 'bg-red-100 text-red-700' : item.status === 'pending' ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700'}`}>
-                                                            {item.status || 'Completed'}
-                                                        </span>
-                                                    </td>
-                                                    <td className="p-3">
-                                                        <button
-                                                            onClick={() => handleEdit(item)}
-                                                            className="text-blue-600 hover:text-blue-800"
-                                                            title="Edit"
-                                                        >
-                                                            <i className="fa fa-edit"></i>
-                                                        </button>
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })}
-                                        {inventory.length === 0 && (
-                                            <tr>
-                                                <td colSpan="8" className="p-8 text-center text-gray-500">
-                                                    No inventory records found
-                                                </td>
-                                            </tr>
-                                        )}
-                                    </tbody>
-                                </table>
+                            {/* Toggle */}
+                            <div className="flex gap-2 mb-5 border-b border-gray-200">
+                                {[
+                                    { type: 'in', label: 'Blood IN', icon: 'fa-arrow-down', color: 'green' },
+                                    { type: 'out', label: 'Blood OUT', icon: 'fa-arrow-up', color: 'red' }
+                                ].map(t => {
+                                    const count = inventory.filter(i => i.inventoryType === t.type).length;
+                                    const active = recordsSubTab === t.type;
+                                    return (
+                                        <button
+                                            key={t.type}
+                                            onClick={() => setRecordsSubTab(t.type)}
+                                            className={`px-4 py-2 text-sm font-semibold flex items-center gap-2 border-b-2 -mb-px transition ${active
+                                                ? (t.color === 'green' ? 'border-green-600 text-green-700' : 'border-red-600 text-red-700')
+                                                : 'border-transparent text-gray-500 hover:text-gray-700'
+                                                }`}
+                                        >
+                                            <i className={`fa ${t.icon}`}></i> {t.label} ({count})
+                                        </button>
+                                    );
+                                })}
                             </div>
+
+                            {(() => {
+                                const rows = inventory.filter(i => i.inventoryType === recordsSubTab);
+                                const isInTab = recordsSubTab === 'in';
+                                return (
+                                    <div className="bg-white rounded-xl shadow-lg overflow-hidden overflow-x-auto">
+                                        <table className="w-full">
+                                            <thead className="bg-gray-100">
+                                                <tr>
+                                                    <th className="p-3 text-left text-sm">Blood Group</th>
+                                                    <th className="p-3 text-left text-sm">Quantity</th>
+                                                    <th className="p-3 text-left text-sm">Details / Note</th>
+                                                    <th className="p-3 text-left text-sm">Expiry Date</th>
+                                                    <th className="p-3 text-left text-sm">Date</th>
+                                                    <th className="p-3 text-left text-sm">Status</th>
+                                                    <th className="p-3 text-left text-sm">Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {rows.map((item) => {
+                                                    const isExpired = item.status === 'expired' || new Date(item.expiryDate) < new Date();
+                                                    const isExpiringSoon = !isExpired && new Date(item.expiryDate) < new Date(Date.now() + 5 * 24 * 60 * 60 * 1000);
+                                                    const counterparty = item.donor?.name || item.organisation?.organisationName || item.hospital?.hospitalName || item.source_name || item.target_name || 'N/A';
+                                                    const isDailyUsage = item.target_name === 'Daily Usage';
+
+                                                    return (
+                                                        <tr key={item._id} className={`border-b hover:bg-gray-50 ${isExpired ? 'bg-red-50' : isExpiringSoon ? 'bg-orange-50' : ''}`}>
+                                                            <td className="p-3 text-red-600 font-bold">{item.bloodGroup}</td>
+                                                            <td className="p-3 font-semibold">{item.quantity}</td>
+                                                            <td className="p-3 text-sm max-w-xs">
+                                                                {isDailyUsage ? (
+                                                                    <span className="font-semibold text-gray-700">Used for patient care</span>
+                                                                ) : (
+                                                                    <span>{isInTab ? 'IN' : 'OUT'} <span className="text-gray-500">{isInTab ? 'from' : 'to'}</span> <strong>{counterparty}</strong></span>
+                                                                )}
+                                                                {item.notes && (
+                                                                    <div className="text-xs text-gray-500 mt-0.5 italic">"{item.notes}"</div>
+                                                                )}
+                                                            </td>
+                                                            <td className="p-3">
+                                                                <span className={isExpired ? 'text-red-600 font-bold' : isExpiringSoon ? 'text-orange-600 font-semibold' : 'text-gray-700'}>
+                                                                    {new Date(item.expiryDate).toLocaleDateString()}
+                                                                </span>
+                                                            </td>
+                                                            <td className="p-3 text-sm">{new Date(item.createdAt).toLocaleDateString()}</td>
+                                                            <td className="p-3">
+                                                                <span className={`px-2 py-1 rounded text-xs font-semibold ${item.status === 'expired' ? 'bg-red-100 text-red-700' : item.status === 'pending' ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700'}`}>
+                                                                    {item.status || 'Completed'}
+                                                                </span>
+                                                            </td>
+                                                            <td className="p-3">
+                                                                <button
+                                                                    onClick={() => handleEdit(item)}
+                                                                    className="text-blue-600 hover:text-blue-800"
+                                                                    title="Edit"
+                                                                >
+                                                                    <i className="fa fa-edit"></i>
+                                                                </button>
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                                {rows.length === 0 && (
+                                                    <tr>
+                                                        <td colSpan="7" className="p-8 text-center text-gray-500">
+                                                            No {recordsSubTab.toUpperCase()} records found
+                                                        </td>
+                                                    </tr>
+                                                )}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                );
+                            })()}
                         </div>
                     )}
 
                     {/* TRANSFERS TAB */}
                     {activeTab === 'transfers' && (
                         <div>
-                            <h2 className="text-xl font-bold mb-4 text-gray-800">
-                                Blood Transfers & Requests
-                                {transfers.filter(t => ['org_approved'].includes(t.status)).length > 0 && (
-                                    <span className="ml-2 bg-green-100 text-green-700 text-sm font-semibold px-2 py-0.5 rounded-full">
-                                        {transfers.filter(t => t.status === 'org_approved').length} awaiting your confirmation
-                                    </span>
-                                )}
-                            </h2>
+                            <h2 className="text-xl font-bold mb-4 text-gray-800">Blood Transfers & Requests</h2>
+
+                            {/* Pending / History toggle */}
+                            <div className="flex gap-2 mb-4 border-b border-gray-200">
+                                {[
+                                    { key: 'pending', label: 'Pending', count: transfers.filter(isTransferPending).length },
+                                    { key: 'history', label: 'History', count: transfers.filter(t => !isTransferPending(t)).length }
+                                ].map(t => (
+                                    <button
+                                        key={t.key}
+                                        onClick={() => setTransfersSubTab(t.key)}
+                                        className={`px-4 py-2 text-sm font-semibold border-b-2 -mb-px transition ${transfersSubTab === t.key ? 'border-red-600 text-red-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                                    >
+                                        {t.label} ({t.count})
+                                    </button>
+                                ))}
+                            </div>
 
                             {/* Status legend */}
                             <div className="flex flex-wrap gap-2 mb-4 text-xs">
@@ -935,63 +1224,91 @@ const HospitalDashboard = () => {
                                     { s: 'requested', c: 'bg-yellow-100 text-yellow-700', l: 'Sent to Org' },
                                     { s: 'org_approved', c: 'bg-blue-100 text-blue-700', l: 'Org Approved — Confirm Receipt' },
                                     { s: 'org_rejected', c: 'bg-red-100 text-red-700', l: 'Org Rejected' },
-                                    { s: 'hospital_approved', c: 'bg-purple-100 text-purple-700', l: 'You Confirmed — Awaiting Admin' },
+                                    { s: 'hospital_approved', c: 'bg-green-100 text-green-700', l: 'Confirmed — Completed ✅' },
+                                    { s: 'hospital_rejected', c: 'bg-red-100 text-red-700', l: 'You Rejected' },
                                     { s: 'admin_approved', c: 'bg-green-100 text-green-700', l: 'Finalised ✅' },
-                                    { s: 'admin_rejected', c: 'bg-red-100 text-red-700', l: 'Admin Rejected' },
                                 ].map(({ s, c, l }) => <span key={s} className={`px-2 py-1 rounded-full font-semibold ${c}`}>{l}</span>)}
                             </div>
 
                             <div className="space-y-4">
-                                {transfers.map(t => (
-                                    <div key={t._id} className={`bg-white rounded-lg shadow p-5 border-l-4 ${t.status === 'admin_approved' ? 'border-green-500' :
-                                            t.status === 'org_approved' ? 'border-blue-500' :
-                                                t.status === 'hospital_approved' ? 'border-purple-500' :
+                                {transfers.filter(t => transfersSubTab === 'pending' ? isTransferPending(t) : !isTransferPending(t)).map(t => {
+                                    const isPush = t.initiatedBy === 'organisation';
+                                    const awaitingYourConfirm = t.status === 'org_approved' && !isPush;
+                                    const isSentNotification = t.status === 'org_approved' && isPush && !t.hospitalAcknowledged;
+                                    return (
+                                        <div key={t._id} className={`bg-white rounded-lg shadow p-5 border-l-4 ${t.status === 'admin_approved' || t.status === 'hospital_approved' ? 'border-green-500' :
+                                            isSentNotification ? 'border-orange-500' :
+                                                awaitingYourConfirm ? 'border-blue-500' :
                                                     t.status === 'requested' ? 'border-yellow-500' : 'border-red-500'
-                                        }`}>
-                                        <div className="flex items-start justify-between gap-4">
-                                            <div className="flex-1">
-                                                <div className="flex items-center gap-2 mb-2 flex-wrap">
-                                                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${t.status === 'admin_approved' ? 'bg-green-100 text-green-700' :
-                                                            t.status === 'org_approved' ? 'bg-blue-100 text-blue-700' :
-                                                                t.status === 'hospital_approved' ? 'bg-purple-100 text-purple-700' :
+                                            }`}>
+                                            <div className="flex items-start justify-between gap-4">
+                                                <div className="flex-1">
+                                                    <div className="flex items-center gap-2 mb-2 flex-wrap">
+                                                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${t.status === 'admin_approved' || t.status === 'hospital_approved' ? 'bg-green-100 text-green-700' :
+                                                            isSentNotification ? 'bg-orange-100 text-orange-700' :
+                                                                awaitingYourConfirm ? 'bg-blue-100 text-blue-700' :
                                                                     t.status === 'requested' ? 'bg-yellow-100 text-yellow-700' :
                                                                         'bg-red-100 text-red-700'
-                                                        }`}>{t.status.replace(/_/g, ' ').toUpperCase()}</span>
-                                                    <span className="text-xs text-gray-500 font-mono">{t.transferId}</span>
+                                                            }`}>{isSentNotification || (isPush && t.status === 'org_approved') ? 'BLOOD SENT TO YOU' : t.status.replace(/_/g, ' ').toUpperCase()}</span>
+                                                        <span className="text-xs text-gray-500 font-mono">{t.transferId}</span>
+                                                        {isPush && <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">Direct Send</span>}
+                                                    </div>
+                                                    <p className="font-semibold text-gray-800 mb-1">Organisation: {t.organisation?.organisationName}</p>
+                                                    <div className="flex flex-wrap gap-2 mb-2">
+                                                        {t.items.map((item, idx) => (
+                                                            <span key={idx} className="bg-red-50 border border-red-200 text-red-700 text-xs px-2 py-1 rounded font-semibold">
+                                                                {item.bloodGroup}: {item.quantity} units
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                    {t.notes && <p className="text-xs text-gray-500 mb-1">Notes: {t.notes}</p>}
+                                                    {t.status === 'org_rejected' && <p className="text-xs text-red-600">Org reason: {t.orgRejectionReason}</p>}
+                                                    {t.status === 'hospital_rejected' && <p className="text-xs text-red-600">You rejected: {t.hospitalRejectionReason}</p>}
+                                                    {(t.status === 'admin_approved' || t.status === 'hospital_approved') && <p className="text-xs text-green-700 font-semibold">✅ Stock has been added to your inventory</p>}
+                                                    {isSentNotification && (
+                                                        <div className="bg-orange-50 border border-orange-200 rounded-lg p-2 mt-1 text-xs text-orange-800">
+                                                            <i className="fa fa-info-circle mr-1"></i>
+                                                            This organisation sent this blood directly. Check the details above, then use <strong>"Add Manual Record"</strong> to add it to your own stock.
+                                                        </div>
+                                                    )}
+                                                    {isPush && t.status === 'org_approved' && t.hospitalAcknowledged && (
+                                                        <p className="text-xs text-gray-500 mt-1">✓ Dismissed from pending</p>
+                                                    )}
+                                                    <p className="text-xs text-gray-400 mt-1">{new Date(t.createdAt).toLocaleString()}</p>
                                                 </div>
-                                                <p className="font-semibold text-gray-800 mb-1">Organisation: {t.organisation?.organisationName}</p>
-                                                <div className="flex flex-wrap gap-2 mb-2">
-                                                    {t.items.map((item, idx) => (
-                                                        <span key={idx} className="bg-red-50 border border-red-200 text-red-700 text-xs px-2 py-1 rounded font-semibold">
-                                                            {item.bloodGroup}: {item.quantity} units
-                                                        </span>
-                                                    ))}
-                                                </div>
-                                                {t.notes && <p className="text-xs text-gray-500 mb-1">Notes: {t.notes}</p>}
-                                                {t.org_rejected && <p className="text-xs text-red-600">Org reason: {t.orgRejectionReason}</p>}
-                                                {t.status === 'admin_approved' && <p className="text-xs text-green-700 font-semibold">✅ Stock has been added to your inventory</p>}
-                                                <p className="text-xs text-gray-400 mt-1">{new Date(t.createdAt).toLocaleString()}</p>
+                                                {/* Hospital action — only for a request the hospital itself sent */}
+                                                {awaitingYourConfirm && (
+                                                    <div className="flex flex-col gap-2 flex-shrink-0">
+                                                        <button onClick={() => handleApproveTransfer(t._id)}
+                                                            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-semibold">
+                                                            ✅ Confirm Receipt
+                                                        </button>
+                                                        <button onClick={() => { setRejectTransferId(t._id); setRejectReason(''); }}
+                                                            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm font-semibold">
+                                                            ❌ Reject
+                                                        </button>
+                                                    </div>
+                                                )}
+                                                {isSentNotification && (
+                                                    <div className="flex flex-col gap-2 flex-shrink-0">
+                                                        <button onClick={() => openManualAddModal(t)}
+                                                            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-semibold whitespace-nowrap">
+                                                            <i className="fa fa-plus mr-1"></i> Add Manual Record
+                                                        </button>
+                                                        <button onClick={() => handleAcknowledge(t._id)}
+                                                            className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 text-sm font-semibold whitespace-nowrap">
+                                                            Dismiss
+                                                        </button>
+                                                    </div>
+                                                )}
                                             </div>
-                                            {/* Hospital action — only when org has approved */}
-                                            {t.status === 'org_approved' && (
-                                                <div className="flex flex-col gap-2 flex-shrink-0">
-                                                    <button onClick={() => handleApproveTransfer(t._id)}
-                                                        className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-semibold">
-                                                        ✅ Confirm Receipt
-                                                    </button>
-                                                    <button onClick={() => { setRejectTransferId(t._id); setRejectReason(''); }}
-                                                        className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm font-semibold">
-                                                        ❌ Reject
-                                                    </button>
-                                                </div>
-                                            )}
                                         </div>
-                                    </div>
-                                ))}
-                                {transfers.length === 0 && (
+                                    );
+                                })}
+                                {transfers.filter(t => transfersSubTab === 'pending' ? isTransferPending(t) : !isTransferPending(t)).length === 0 && (
                                     <div className="bg-white rounded-lg shadow p-12 text-center text-gray-500">
                                         <i className="fa fa-exchange-alt text-5xl text-gray-200 mb-3 block"></i>
-                                        <p>No transfer requests yet</p>
+                                        <p>{transfersSubTab === 'pending' ? 'Nothing pending right now' : 'No history yet'}</p>
                                     </div>
                                 )}
                             </div>
@@ -1020,6 +1337,143 @@ const HospitalDashboard = () => {
                                         <p className="text-gray-500">No notifications at this time</p>
                                     </div>
                                 )}
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'profile' && (
+                        <div className="max-w-2xl space-y-6">
+                            <div className="bg-white rounded-xl shadow p-6">
+                                <h2 className="text-xl font-bold mb-4 text-gray-800 flex items-center gap-2">
+                                    <i className="fa fa-user-gear text-red-600"></i> Profile
+                                </h2>
+                                <form onSubmit={handleProfileSave} className="space-y-4">
+                                    <div>
+                                        <label className="block text-gray-700 font-semibold mb-2">Hospital Name</label>
+                                        <input
+                                            type="text"
+                                            name="hospitalName"
+                                            value={profileForm.hospitalName}
+                                            onChange={handleProfileChange}
+                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-gray-700 font-semibold mb-2">Phone Number</label>
+                                        <input
+                                            type="tel"
+                                            name="phone"
+                                            value={profileForm.phone}
+                                            onChange={handleProfileChange}
+                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none"
+                                        />
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        <div>
+                                            <label className="block text-gray-700 font-semibold mb-2">State</label>
+                                            <select
+                                                name="state"
+                                                value={profileForm.state}
+                                                onChange={handleProfileChange}
+                                                className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-red-500 outline-none"
+                                            >
+                                                <option value="">Select State</option>
+                                                {profileStates.map((s, i) => <option key={i} value={s.state}>{s.state}</option>)}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-gray-700 font-semibold mb-2">District</label>
+                                            <select
+                                                name="district"
+                                                value={profileForm.district}
+                                                onChange={handleProfileChange}
+                                                disabled={!profileForm.state}
+                                                className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white disabled:bg-gray-100 focus:ring-2 focus:ring-red-500 outline-none"
+                                            >
+                                                <option value="">Select District</option>
+                                                {profileDistricts.map((d, i) => <option key={i} value={d.DIST_name}>{d.DIST_name}</option>)}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-gray-700 font-semibold mb-2">City</label>
+                                            <select
+                                                name="city"
+                                                value={profileForm.city}
+                                                onChange={handleProfileChange}
+                                                disabled={!profileForm.district}
+                                                className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white disabled:bg-gray-100 focus:ring-2 focus:ring-red-500 outline-none"
+                                            >
+                                                <option value="">Select City</option>
+                                                {profileCities.map((c, i) => <option key={i} value={c}>{c}</option>)}
+                                            </select>
+                                        </div>
+                                    </div>
+                                    {profileMessage && (
+                                        <p className={`text-sm ${profileMessage.startsWith('✅') ? 'text-green-600' : 'text-red-600'}`}>{profileMessage}</p>
+                                    )}
+                                    <button
+                                        type="submit"
+                                        disabled={profileSaving}
+                                        className="px-6 py-2 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition disabled:opacity-50"
+                                    >
+                                        {profileSaving ? 'Saving...' : 'Update Profile'}
+                                    </button>
+                                </form>
+                            </div>
+
+                            <div className="bg-white rounded-xl shadow p-6">
+                                <h2 className="text-xl font-bold mb-4 text-gray-800 flex items-center gap-2">
+                                    <i className="fa fa-lock text-red-600"></i> Reset Password
+                                </h2>
+                                <form onSubmit={handlePasswordSave} className="space-y-4">
+                                    <div>
+                                        <label className="block text-gray-700 font-semibold mb-2">Current Password</label>
+                                        <input
+                                            type="password"
+                                            name="currentPassword"
+                                            value={passwordForm.currentPassword}
+                                            onChange={handlePasswordChange}
+                                            required
+                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none"
+                                        />
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-gray-700 font-semibold mb-2">New Password</label>
+                                            <input
+                                                type="password"
+                                                name="newPassword"
+                                                value={passwordForm.newPassword}
+                                                onChange={handlePasswordChange}
+                                                required
+                                                minLength={6}
+                                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-gray-700 font-semibold mb-2">Confirm New Password</label>
+                                            <input
+                                                type="password"
+                                                name="confirmNewPassword"
+                                                value={passwordForm.confirmNewPassword}
+                                                onChange={handlePasswordChange}
+                                                required
+                                                minLength={6}
+                                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none"
+                                            />
+                                        </div>
+                                    </div>
+                                    {passwordMessage && (
+                                        <p className={`text-sm ${passwordMessage.startsWith('✅') ? 'text-green-600' : 'text-red-600'}`}>{passwordMessage}</p>
+                                    )}
+                                    <button
+                                        type="submit"
+                                        disabled={passwordSaving}
+                                        className="px-6 py-2 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition disabled:opacity-50"
+                                    >
+                                        {passwordSaving ? 'Saving...' : 'Change Password'}
+                                    </button>
+                                </form>
                             </div>
                         </div>
                     )}
@@ -1104,7 +1558,7 @@ const HospitalDashboard = () => {
 
                                     <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-800">
                                         <i className="fa fa-info-circle mr-1"></i>
-                                        Flow: Your request → Organisation checks stock → Org approves/rejects → You confirm receipt → Admin finalises → Stock updated
+                                        Flow: Your request → Organisation approves (their stock decreases) → You confirm receipt (your stock increases)
                                     </div>
 
                                     <div className="flex gap-3 pt-2">
@@ -1198,6 +1652,109 @@ const HospitalDashboard = () => {
                             </div>
                         </div>
                     )}
+
+                    {/* Add Manual Record Modal — hospital credits their own stock */}
+                    {showManualAddModal && (
+                        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                            <div className="bg-white rounded-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+                                <div className="bg-blue-600 text-white px-6 py-4 rounded-t-xl flex items-center justify-between sticky top-0">
+                                    <h2 className="text-xl font-bold flex items-center gap-2">
+                                        <i className="fa fa-plus"></i>
+                                        Add Manual Record
+                                    </h2>
+                                    <button
+                                        onClick={() => { setShowManualAddModal(false); setManualAddSourceTransferId(null); }}
+                                        className="text-white hover:text-gray-200"
+                                    >
+                                        <i className="fa fa-times text-xl"></i>
+                                    </button>
+                                </div>
+
+                                <form onSubmit={handleManualAddRecord} className="p-6 space-y-4">
+                                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-800">
+                                        <i className="fa fa-info-circle mr-1"></i>
+                                        {manualAddSourceTransferId
+                                            ? 'Pre-filled from the blood sent to you — check the details below, then confirm.'
+                                            : "Use this to credit blood you've received — e.g. a direct send from an organisation, or a walk-in donor at your hospital."}
+                                        {' '}Your stock increases immediately.
+                                    </div>
+
+                                    <div>
+                                        <div className="flex items-center justify-between mb-2">
+                                            <label className="text-gray-700 font-semibold">Blood Group(s) *</label>
+                                            <button type="button" onClick={addManualAddItem}
+                                                className="text-xs px-3 py-1.5 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 font-semibold">
+                                                <i className="fa fa-plus mr-1"></i> Add Blood Group
+                                            </button>
+                                        </div>
+                                        <div className="space-y-3">
+                                            {manualAddItems.map((item, idx) => (
+                                                <div key={idx} className="rounded-lg p-3 border border-gray-200 bg-gray-50">
+                                                    <div className="grid grid-cols-3 gap-2">
+                                                        <select value={item.bloodGroup} onChange={e => updateManualAddItem(idx, 'bloodGroup', e.target.value)}
+                                                            className="border border-gray-300 rounded-lg px-2 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                                                            <option value="">Blood Group</option>
+                                                            {['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'].map(bg => (
+                                                                <option key={bg} value={bg}>{bg}</option>
+                                                            ))}
+                                                        </select>
+                                                        <input type="number" placeholder="Units" value={item.quantity} min="1"
+                                                            onChange={e => updateManualAddItem(idx, 'quantity', e.target.value)}
+                                                            className="border border-gray-300 rounded-lg px-2 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" />
+                                                        <input type="date" value={item.expiryDate}
+                                                            min={new Date().toISOString().split('T')[0]}
+                                                            onChange={e => updateManualAddItem(idx, 'expiryDate', e.target.value)}
+                                                            className="border border-gray-300 rounded-lg px-2 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" />
+                                                    </div>
+                                                    {manualAddItems.length > 1 && (
+                                                        <button type="button" onClick={() => removeManualAddItem(idx)}
+                                                            className="text-xs text-red-500 hover:text-red-700 mt-1">
+                                                            <i className="fa fa-trash mr-1"></i>Remove
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-gray-700 font-semibold mb-2">Notes (Optional)</label>
+                                        <textarea
+                                            value={manualAddNotes}
+                                            onChange={(e) => setManualAddNotes(e.target.value)}
+                                            placeholder="e.g., Received from CityCare Organisation, walk-in donor..."
+                                            rows="3"
+                                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                                        />
+                                    </div>
+
+                                    <div className="flex gap-3 pt-4">
+                                        <button
+                                            type="submit"
+                                            disabled={manualAddSaving}
+                                            className="flex-1 bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition disabled:opacity-50"
+                                        >
+                                            {manualAddSaving ? 'Saving...' : 'Add Record'}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowManualAddModal(false)}
+                                            className="flex-1 bg-gray-200 text-gray-700 py-3 rounded-lg font-semibold hover:bg-gray-300 transition"
+                                        >
+                                            Cancel
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    )}
+
+                    <EditInventoryModal
+                        show={showEditModal}
+                        onClose={() => setShowEditModal(false)}
+                        onSuccess={() => { fetchInventory(); fetchTransfers(); }}
+                        inventoryRecord={selectedInventory}
+                    />
 
                     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
                 </main>

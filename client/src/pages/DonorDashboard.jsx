@@ -5,7 +5,14 @@ import { authAPI, inventoryAPI, donorAPI } from '../services/api';
 const DonorDashboard = () => {
     const navigate = useNavigate();
     const [user, setUser] = useState(null);
-    const [activeTab, setActiveTab] = useState('dashboard');
+    const [activeTab, setActiveTab] = useState(() => sessionStorage.getItem('donor_active_tab') || 'dashboard');
+    useEffect(() => { sessionStorage.setItem('donor_active_tab', activeTab); }, [activeTab]);
+
+    const handleTabChange = (tab) => {
+        setActiveTab(tab);
+        setSidebarOpen(false);
+        fetchDonations();
+    };
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [donations, setDonations] = useState([]);
     const [stats, setStats] = useState({
@@ -363,9 +370,13 @@ const DonorDashboard = () => {
     };
 
     const handleLogout = async () => {
-        await authAPI.logout();
+        try {
+            await authAPI.logout();
+        } catch (error) {
+            console.error('Logout error:', error);
+        }
         localStorage.removeItem('user');
-        navigate('/');
+        window.location.replace('/login');
     };
 
     const isEligibleToDonate = () => {
@@ -396,19 +407,19 @@ const DonorDashboard = () => {
 
                 <nav className="flex-1 p-4 space-y-3">
                     <button
-                        onClick={() => { setActiveTab('dashboard'); setSidebarOpen(false); }}
+                        onClick={() => handleTabChange('dashboard')}
                         className={`w-full flex items-center p-2 rounded-lg transition ${activeTab === 'dashboard' ? 'bg-red-600' : 'hover:bg-red-600'}`}
                     >
                         <i className="fa fa-gauge w-6"></i> Dashboard
                     </button>
                     <button
-                        onClick={() => { setActiveTab('profile'); setSidebarOpen(false); }}
+                        onClick={() => handleTabChange('profile')}
                         className={`w-full flex items-center p-2 rounded-lg transition ${activeTab === 'profile' ? 'bg-red-600' : 'hover:bg-red-600'}`}
                     >
                         <i className="fa fa-user w-6"></i> My Profile
                     </button>
                     <button
-                        onClick={() => { setActiveTab('donations'); setSidebarOpen(false); }}
+                        onClick={() => handleTabChange('donations')}
                         className={`w-full flex items-center p-2 rounded-lg transition ${activeTab === 'donations' ? 'bg-red-600' : 'hover:bg-red-600'}`}
                     >
                         <i className="fa fa-heartbeat w-6"></i> My Donations

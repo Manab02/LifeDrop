@@ -58,7 +58,13 @@ router.post('/search', async (req, res) => {
             const hospitalsWithStock = await Promise.all(
                 hospitals.map(async (hospital) => {
                     const inventory = await inventoryModels.find({
-                        hospital: hospital._id
+                        hospital: hospital._id,
+                        status: { $ne: 'expired' },
+                        expiryDate: { $gt: new Date() },
+                        $or: [
+                            { inventoryType: 'in' },
+                            { inventoryType: 'out', source_type: { $in: ['hospital', 'patient', 'manual', null] } }
+                        ]
                     });
 
                     const bloodGroups = ['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'];
@@ -75,6 +81,8 @@ router.post('/search', async (req, res) => {
                             bloodStock[item.bloodGroup] = (bloodStock[item.bloodGroup] || 0) - item.quantity;
                         }
                     });
+
+                    Object.keys(bloodStock).forEach(g => { if (bloodStock[g] < 0) bloodStock[g] = 0; });
 
                     if (bloodGroup && bloodStock[bloodGroup] <= 0) {
                         return null;
@@ -115,7 +123,13 @@ router.post('/search', async (req, res) => {
             const organisationsWithStock = await Promise.all(
                 organisations.map(async (org) => {
                     const inventory = await inventoryModels.find({
-                        organisation: org._id
+                        organisation: org._id,
+                        status: { $ne: 'expired' },
+                        expiryDate: { $gt: new Date() },
+                        $or: [
+                            { inventoryType: 'out' },
+                            { inventoryType: 'in', target_type: { $ne: 'hospital' } }
+                        ]
                     });
 
                     const bloodGroups = ['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'];
@@ -132,6 +146,8 @@ router.post('/search', async (req, res) => {
                             bloodStock[item.bloodGroup] = (bloodStock[item.bloodGroup] || 0) - item.quantity;
                         }
                     });
+
+                    Object.keys(bloodStock).forEach(g => { if (bloodStock[g] < 0) bloodStock[g] = 0; });
 
                     if (bloodGroup && bloodStock[bloodGroup] <= 0) {
                         return null;
@@ -358,7 +374,11 @@ router.post('/check-org-stock', async (req, res) => {
             organisation: organisationId,
             bloodGroup,
             status: { $ne: 'expired' },
-            expiryDate: { $gt: new Date() }
+            expiryDate: { $gt: new Date() },
+            $or: [
+                { inventoryType: 'out' },
+                { inventoryType: 'in', target_type: { $ne: 'hospital' } }
+            ]
         });
 
         let net = 0;

@@ -7,7 +7,11 @@ const getOrgStock = async (orgId) => {
     const inv = await inventoryModels.find({
         organisation: orgId,
         status: { $ne: 'expired' },
-        expiryDate: { $gt: new Date() }
+        expiryDate: { $gt: new Date() },
+        $or: [
+            { inventoryType: 'out' },
+            { inventoryType: 'in', target_type: { $ne: 'hospital' } }
+        ]
     });
     const stock = {};
     inv.forEach(i => {
@@ -17,8 +21,8 @@ const getOrgStock = async (orgId) => {
     return stock;
 };
 
-// ── Helper: create OUT (org) + IN (hospital) records ─────────────
-const createInventoryRecords = async (transfer) => {
+// ── Helper: org's OUT record only (their stock decreases now) ────
+const createOrgOutRecords = async (transfer) => {
     const records = [];
     for (const item of transfer.items) {
         const expiryDate = item.expiryDate || new Date(Date.now() + 42 * 86400000);
@@ -38,6 +42,19 @@ const createInventoryRecords = async (transfer) => {
             verified: true,
             notes: `Transfer ${transfer.transferId}`
         });
+        records.push(out._id);
+    }
+    return records;
+};
+
+// ── Helper: hospital's IN record only (their stock increases now) ─
+const createHospitalInRecords = async (transfer) => {
+    const records = [];
+    for (const item of transfer.items) {
+        const expiryDate = item.expiryDate || new Date(Date.now() + 42 * 86400000);
+        const orgId = transfer.organisation._id || transfer.organisation;
+        const hospId = transfer.hospital._id || transfer.hospital;
+
         const inp = await inventoryModels.create({
             inventoryType: 'in',
             bloodGroup: item.bloodGroup,
@@ -51,7 +68,28 @@ const createInventoryRecords = async (transfer) => {
             verified: true,
             notes: `Transfer ${transfer.transferId}`
         });
-        records.push(out._id, inp._id);
+        records.push(inp._id);
+    }
+    return records;
+};
+
+// ── Helper: give the org back stock the hospital rejected ────────
+const createOrgReturnRecords = async (transfer, reason) => {
+    const records = [];
+    for (const item of transfer.items) {
+        const orgId = transfer.organisation._id || transfer.organisation;
+        const ret = await inventoryModels.create({
+            inventoryType: 'in',
+            bloodGroup: item.bloodGroup,
+            quantity: item.quantity,
+            expiryDate: item.expiryDate || new Date(Date.now() + 42 * 86400000),
+            organisation: orgId,
+            source_type: 'manual',
+            status: 'completed',
+            verified: true,
+            notes: `Returned — hospital rejected transfer ${transfer.transferId}: ${reason || ''}`
+        });
+        records.push(ret._id);
     }
     return records;
 };
@@ -86,20 +124,18 @@ export const orgInitiateTransfer = async (req, res) => {
             hospital: hospitalId,
             items: items.map(i => ({ bloodGroup: i.bloodGroup, quantity: parseInt(i.quantity), expiryDate: new Date(i.expiryDate) })),
             notes: notes || '',
-            status: 'admin_approved',   // org-initiated = immediately finalised
+            status: 'org_approved',   // sent — this is a notification to the hospital, not an auto-credit
             initiatedBy: 'organisation',
             orgApprovedBy: req.body.userId,
-            orgApprovedAt: new Date(),
-            adminApprovedBy: req.body.userId,
-            adminApprovedAt: new Date()
+            orgApprovedAt: new Date()
         });
 
-        const records = await createInventoryRecords(transfer);
+        const records = await createOrgOutRecords(transfer);
         transfer.inventoryRecords = records;
         await transfer.save();
         await transfer.populate('hospital', 'hospitalName email');
 
-        return res.json({ success: true, message: 'Transfer completed. Blood stock updated on both dashboards.', transfer });
+        return res.json({ success: true, message: 'Sent! Your stock has decreased. The hospital has been notified and can add their own record.', transfer });
     } catch (error) {
         return res.json({ success: false, message: error.message });
     }
@@ -198,16 +234,14 @@ export const orgApproveRequest = async (req, res) => {
             expiryDate: items?.[idx]?.expiryDate ? new Date(items[idx].expiryDate) : new Date(Date.now() + 42 * 86400000)
         }));
 
-        const records = await createInventoryRecords(transfer);
-        transfer.status = 'admin_approved';   // completed
+        const records = await createOrgOutRecords(transfer);
+        transfer.status = 'org_approved';   // awaiting hospital to confirm receipt
         transfer.orgApprovedBy = req.body.userId;
         transfer.orgApprovedAt = new Date();
-        transfer.adminApprovedBy = req.body.userId;
-        transfer.adminApprovedAt = new Date();
         transfer.inventoryRecords = records;
         await transfer.save();
 
-        return res.json({ success: true, message: 'Transfer approved. Blood stock updated on both dashboards.', transfer });
+        return res.json({ success: true, message: 'Approved! Your stock has decreased. Waiting for the hospital to confirm receipt.', transfer });
     } catch (error) {
         return res.json({ success: false, message: error.message });
     }
@@ -237,6 +271,68 @@ export const orgRejectRequest = async (req, res) => {
     }
 };
 
+// ── 5b. Hospital confirms receipt of a request the org already sent ──
+// Only makes sense for hospital-initiated requests (org already decreased
+// their stock at approval time) — creates the hospital's own IN record now.
+export const hospitalApproveTransfer = async (req, res) => {
+    try {
+        const { transferId } = req.params;
+        const user = await userModel.findById(req.body.userId);
+        if (!user || user.role !== 'hospital')
+            return res.json({ success: false, message: 'Hospital only' });
+
+        const transfer = await transferModel.findById(transferId)
+            .populate('organisation', 'organisationName')
+            .populate('hospital', 'hospitalName');
+        if (!transfer) return res.json({ success: false, message: 'Transfer not found' });
+        if (transfer.hospital._id.toString() !== req.body.userId)
+            return res.json({ success: false, message: 'Not your transfer' });
+        if (transfer.status !== 'org_approved')
+            return res.json({ success: false, message: `Cannot confirm — status is ${transfer.status}` });
+
+        const records = await createHospitalInRecords(transfer);
+        transfer.status = 'hospital_approved';
+        transfer.hospitalApprovedBy = req.body.userId;
+        transfer.hospitalApprovedAt = new Date();
+        transfer.inventoryRecords = [...(transfer.inventoryRecords || []), ...records];
+        await transfer.save();
+
+        return res.json({ success: true, message: 'Receipt confirmed! Your stock has increased.', transfer });
+    } catch (error) {
+        return res.json({ success: false, message: error.message });
+    }
+};
+
+// ── 5c. Hospital rejects — gives the org their stock back ────────────
+export const hospitalRejectTransfer = async (req, res) => {
+    try {
+        const { transferId } = req.params;
+        const { reason } = req.body;
+        const user = await userModel.findById(req.body.userId);
+        if (!user || user.role !== 'hospital')
+            return res.json({ success: false, message: 'Hospital only' });
+
+        const transfer = await transferModel.findById(transferId)
+            .populate('organisation', 'organisationName')
+            .populate('hospital', 'hospitalName');
+        if (!transfer) return res.json({ success: false, message: 'Transfer not found' });
+        if (transfer.hospital._id.toString() !== req.body.userId)
+            return res.json({ success: false, message: 'Not your transfer' });
+        if (transfer.status !== 'org_approved')
+            return res.json({ success: false, message: `Cannot reject — status is ${transfer.status}` });
+
+        const records = await createOrgReturnRecords(transfer, reason);
+        transfer.status = 'hospital_rejected';
+        transfer.hospitalRejectionReason = reason || 'Rejected by hospital';
+        transfer.inventoryRecords = [...(transfer.inventoryRecords || []), ...records];
+        await transfer.save();
+
+        return res.json({ success: true, message: 'Rejected. The stock has been returned to the organisation.', transfer });
+    } catch (error) {
+        return res.json({ success: false, message: error.message });
+    }
+};
+
 // ── 6. Admin approves any stuck/pending transfer ──────────────────
 export const adminApprove = async (req, res) => {
     try {
@@ -249,15 +345,17 @@ export const adminApprove = async (req, res) => {
             .populate('organisation', 'organisationName')
             .populate('hospital', 'hospitalName');
         if (!transfer) return res.json({ success: false, message: 'Transfer not found' });
-        if (transfer.status === 'admin_approved')
+        if (['hospital_approved', 'admin_approved'].includes(transfer.status))
             return res.json({ success: false, message: 'Transfer already completed' });
 
-        // Stock check
-        const stock = await getOrgStock(transfer.organisation._id);
-        for (const item of transfer.items) {
-            const avail = stock[item.bloodGroup] || 0;
-            if (avail < item.quantity)
-                return res.json({ success: false, message: `Insufficient ${item.bloodGroup}: need ${item.quantity}, have ${avail}` });
+        // Stock check only needed if the org side hasn't already been deducted
+        if (transfer.status !== 'org_approved') {
+            const stock = await getOrgStock(transfer.organisation._id);
+            for (const item of transfer.items) {
+                const avail = stock[item.bloodGroup] || 0;
+                if (avail < item.quantity)
+                    return res.json({ success: false, message: `Insufficient ${item.bloodGroup}: need ${item.quantity}, have ${avail}` });
+            }
         }
 
         // Add default expiry if missing
@@ -267,11 +365,16 @@ export const adminApprove = async (req, res) => {
             expiryDate: item.expiryDate || new Date(Date.now() + 42 * 86400000)
         }));
 
-        const records = await createInventoryRecords(transfer);
+        const newRecords = [];
+        if (transfer.status !== 'org_approved') {
+            newRecords.push(...await createOrgOutRecords(transfer));
+        }
+        newRecords.push(...await createHospitalInRecords(transfer));
+
         transfer.status = 'admin_approved';
         transfer.adminApprovedBy = req.body.userId;
         transfer.adminApprovedAt = new Date();
-        transfer.inventoryRecords = records;
+        transfer.inventoryRecords = [...(transfer.inventoryRecords || []), ...newRecords];
         await transfer.save();
 
         return res.json({ success: true, message: 'Transfer approved by admin. Stock updated on both dashboards.', transfer });
@@ -297,6 +400,25 @@ export const adminReject = async (req, res) => {
         await transfer.save();
 
         return res.json({ success: true, message: 'Transfer rejected by admin.', transfer });
+    } catch (error) {
+        return res.json({ success: false, message: error.message });
+    }
+};
+
+// ── 5d. Hospital dismisses a push-notification from their Pending list ──
+// (Used after they've manually added their own record, or just to clear it.)
+export const acknowledgeTransfer = async (req, res) => {
+    try {
+        const { transferId } = req.params;
+        const transfer = await transferModel.findById(transferId);
+        if (!transfer) return res.json({ success: false, message: 'Transfer not found' });
+        if (transfer.hospital.toString() !== req.body.userId)
+            return res.json({ success: false, message: 'Not your transfer' });
+
+        transfer.hospitalAcknowledged = true;
+        await transfer.save();
+
+        return res.json({ success: true, transfer });
     } catch (error) {
         return res.json({ success: false, message: error.message });
     }

@@ -13,7 +13,8 @@ export default function OrganisationDashboard() {
     const navigate = useNavigate();
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState('dashboard');
+    const [activeTab, setActiveTab] = useState(() => sessionStorage.getItem('organisation_active_tab') || 'dashboard');
+    useEffect(() => { sessionStorage.setItem('organisation_active_tab', activeTab); }, [activeTab]);
     const [sidebarOpen, setSidebarOpen] = useState(false);
 
     // Data
@@ -54,6 +55,18 @@ export default function OrganisationDashboard() {
     const [campForm, setCampForm] = useState({ title: '', location: '', date: '', description: '' });
     const [campSaving, setCampSaving] = useState(false);
 
+    // ── Profile section state ────────────────────────────────────
+    const [profileForm, setProfileForm] = useState({ organisationName: '', phone: '', state: '', district: '', city: '' });
+    const [profileStates, setProfileStates] = useState([]);
+    const [profileDistricts, setProfileDistricts] = useState([]);
+    const [profileCities, setProfileCities] = useState([]);
+    const [profileSaving, setProfileSaving] = useState(false);
+    const [profileMessage, setProfileMessage] = useState('');
+    const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '', confirmNewPassword: '' });
+    const [passwordSaving, setPasswordSaving] = useState(false);
+    const [passwordMessage, setPasswordMessage] = useState('');
+    const [orgTransfersSubTab, setOrgTransfersSubTab] = useState('pending'); // 'pending' | 'history'
+
     // ── Auth ──────────────────────────────────────────────────────
     useEffect(() => {
         const userData = JSON.parse(localStorage.getItem('user') || '{}');
@@ -68,7 +81,7 @@ export default function OrganisationDashboard() {
 
     // ── Fetch everything ──────────────────────────────────────────
     const fetchAll = useCallback(async () => {
-        await Promise.all([fetchInventory(), fetchCamps(), fetchDonors(), fetchTransfers(), fetchHospitals()]);
+        await Promise.all([fetchInventory(), fetchCamps(), fetchDonors(), fetchTransfers(), fetchHospitals(), fetchOrgProfile()]);
     }, []);
 
     useEffect(() => {
@@ -132,7 +145,7 @@ export default function OrganisationDashboard() {
         if (missingExpiry) { alert('Please set expiry date for all blood groups'); return; }
         const data = await transferAPI.orgApprove(orgActionTransfer._id, orgExpiryItems);
         if (data.success) {
-            alert('✅ Transfer approved! Hospital will confirm receipt.');
+            alert('✅ Approved! Your stock has decreased. Waiting for the hospital to confirm receipt.');
             setOrgActionTransfer(null); setOrgStockCheck(null);
             fetchTransfers(); fetchAll();
         } else alert(data.message || 'Failed');
@@ -261,10 +274,130 @@ export default function OrganisationDashboard() {
     // ── Misc ──────────────────────────────────────────────────────
     const handleEdit = (item) => { setSelectedInventory(item); setShowEditModal(true); };
 
+    // ── Profile: fetch, cascading location lists, update, change password ──
+    const fetchOrgProfile = async () => {
+        const data = await organisationAPI.getProfile();
+        if (data.success && data.organisation) {
+            const o = data.organisation;
+            setProfileForm({
+                organisationName: o.organisationName || '',
+                phone: o.phone || '',
+                state: o.address?.state || '',
+                district: o.address?.district || '',
+                city: o.address?.city || ''
+            });
+        }
+    };
+
+    useEffect(() => {
+        fetch('/states.json').then(r => r.json()).then(setProfileStates).catch(() => { });
+    }, []);
+
+    useEffect(() => {
+        if (profileForm.state) {
+            fetch('/districts.json')
+                .then(r => r.json())
+                .then(data => setProfileDistricts(data.filter(d => d.state_name === profileForm.state)))
+                .catch(() => { });
+        } else {
+            setProfileDistricts([]);
+        }
+    }, [profileForm.state]);
+
+    useEffect(() => {
+        if (profileForm.district) {
+            fetch('/cities.json')
+                .then(r => r.json())
+                .then(data => {
+                    const stateObj = data.india.states.find(s => s.name === profileForm.state);
+                    const districtObj = stateObj?.districts.find(d => d.name === profileForm.district);
+                    setProfileCities(districtObj ? districtObj.cities : []);
+                })
+                .catch(() => { });
+        } else {
+            setProfileCities([]);
+        }
+    }, [profileForm.district, profileForm.state]);
+
+    const handleProfileChange = (e) => {
+        const { name, value } = e.target;
+        setProfileForm(prev => {
+            const next = { ...prev, [name]: value };
+            if (name === 'state') { next.district = ''; next.city = ''; }
+            if (name === 'district') { next.city = ''; }
+            return next;
+        });
+    };
+
+    const handleProfileSave = async (e) => {
+        e.preventDefault();
+        setProfileSaving(true);
+        setProfileMessage('');
+        try {
+            const data = await organisationAPI.updateProfile(profileForm);
+            if (data.success) {
+                setProfileMessage('✅ Profile updated successfully');
+                const stored = JSON.parse(localStorage.getItem('user') || '{}');
+                localStorage.setItem('user', JSON.stringify({
+                    ...stored,
+                    organisationName: profileForm.organisationName,
+                    phone: profileForm.phone,
+                    address: { state: profileForm.state, district: profileForm.district, city: profileForm.city }
+                }));
+                fetchOrgProfile();
+            } else {
+                setProfileMessage(data.message || 'Update failed');
+            }
+        } catch (error) {
+            setProfileMessage('An error occurred');
+        } finally {
+            setProfileSaving(false);
+        }
+    };
+
+    const handlePasswordChange = (e) => {
+        const { name, value } = e.target;
+        setPasswordForm(prev => ({ ...prev, [name]: value }));
+    };
+
+    const handlePasswordSave = async (e) => {
+        e.preventDefault();
+        if (passwordForm.newPassword !== passwordForm.confirmNewPassword) {
+            setPasswordMessage('New passwords do not match');
+            return;
+        }
+        if (passwordForm.newPassword.length < 6) {
+            setPasswordMessage('New password must be at least 6 characters');
+            return;
+        }
+        setPasswordSaving(true);
+        setPasswordMessage('');
+        try {
+            const data = await authAPI.changePassword({
+                currentPassword: passwordForm.currentPassword,
+                newPassword: passwordForm.newPassword
+            });
+            if (data.success) {
+                setPasswordMessage('✅ Password changed successfully');
+                setPasswordForm({ currentPassword: '', newPassword: '', confirmNewPassword: '' });
+            } else {
+                setPasswordMessage(data.message || 'Failed to change password');
+            }
+        } catch (error) {
+            setPasswordMessage('An error occurred');
+        } finally {
+            setPasswordSaving(false);
+        }
+    };
+
     const handleLogout = async () => {
-        await authAPI.logout();
+        try {
+            await authAPI.logout();
+        } catch (error) {
+            console.error('Logout error:', error);
+        }
         localStorage.removeItem('user');
-        navigate('/login');
+        window.location.replace('/login');
     };
 
     const stockStatus = (qty) => {
@@ -287,8 +420,9 @@ export default function OrganisationDashboard() {
         { id: 'donors', icon: 'fa-users', label: 'Donor List' },
         { id: 'records', icon: 'fa-hand-holding-heart', label: 'Donation Records' },
         { id: 'hospitals', icon: 'fa-hospital', label: 'Hospital Records' },
-        { id: 'transfers', icon: 'fa-exchange-alt', label: 'Transfers', badge: transfers.filter(t => t.status === 'pending').length || null },
+        { id: 'transfers', icon: 'fa-exchange-alt', label: 'Transfers', badge: transfers.filter(t => t.status === 'requested').length || null },
         { id: 'notifications', icon: 'fa-bell', label: 'Notifications', badge: notifCount || null },
+        { id: 'profile', icon: 'fa-user-gear', label: 'Profile' },
     ];
 
     const SidebarContent = () => (
@@ -301,7 +435,7 @@ export default function OrganisationDashboard() {
             <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
                 {navItems.map(item => (
                     <button key={item.id}
-                        onClick={() => { setActiveTab(item.id); setSidebarOpen(false); }}
+                        onClick={() => { setActiveTab(item.id); setSidebarOpen(false); fetchAll(); }}
                         className={`w-full flex items-center justify-between p-3 rounded-lg text-left transition text-sm ${activeTab === item.id ? 'bg-red-600 font-semibold' : 'hover:bg-red-600/70'}`}>
                         <span className="flex items-center gap-2">
                             <i className={`fa ${item.icon} w-5 text-center`}></i>
@@ -657,66 +791,89 @@ export default function OrganisationDashboard() {
                                 </button>
                             </div>
 
+                            {/* Pending / Transfer Records toggle */}
+                            <div className="flex gap-2 mb-4 border-b border-gray-200">
+                                {[
+                                    { key: 'pending', label: 'Pending Requests', count: transfers.filter(t => t.status === 'requested').length },
+                                    { key: 'history', label: 'Transfer Records', count: transfers.filter(t => t.status !== 'requested').length }
+                                ].map(t => (
+                                    <button
+                                        key={t.key}
+                                        onClick={() => setOrgTransfersSubTab(t.key)}
+                                        className={`px-4 py-2 text-sm font-semibold border-b-2 -mb-px transition ${orgTransfersSubTab === t.key ? 'border-red-600 text-red-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                                    >
+                                        {t.label} ({t.count})
+                                    </button>
+                                ))}
+                            </div>
+
                             {/* Status legend */}
                             <div className="flex flex-wrap gap-2 mb-4 text-xs">
                                 {[
                                     { s: 'requested', c: 'bg-yellow-100 text-yellow-700', l: '🏥 Hospital Request — Action Needed' },
-                                    { s: 'completed', c: 'bg-green-100 text-green-700', l: '✅ Completed — Stock Updated' },
-                                    { s: 'org_rejected', c: 'bg-red-100 text-red-700', l: 'Rejected' },
+                                    { s: 'org_approved', c: 'bg-blue-100 text-blue-700', l: '📤 Sent — Awaiting Hospital Confirmation' },
+                                    { s: 'hospital_approved', c: 'bg-green-100 text-green-700', l: '✅ Completed — Stock Updated Both Sides' },
+                                    { s: 'org_rejected', c: 'bg-red-100 text-red-700', l: 'Rejected by You' },
+                                    { s: 'hospital_rejected', c: 'bg-red-100 text-red-700', l: 'Rejected by Hospital — Stock Returned' },
                                     { s: 'admin_rejected', c: 'bg-gray-100 text-gray-700', l: 'Rejected by Admin' },
                                 ].map(({ s, c, l }) => <span key={s} className={`px-2 py-1 rounded-full font-semibold ${c}`}>{l}</span>)}
                             </div>
 
                             <div className="space-y-3">
-                                {transfers.map(t => (
-                                    <div key={t._id} className={`bg-white rounded-lg shadow p-4 border-l-4 ${t.status === 'completed' ? 'border-green-500' :
-                                            t.status === 'requested' ? 'border-yellow-500' :
-                                                'border-red-500'
-                                        }`}>
-                                        <div className="flex items-start justify-between gap-3">
-                                            <div className="flex-1">
-                                                <div className="flex items-center gap-2 mb-1 flex-wrap">
-                                                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${t.status === 'completed' ? 'bg-green-100 text-green-700' :
-                                                            t.status === 'requested' ? 'bg-yellow-100 text-yellow-700' :
-                                                                'bg-red-100 text-red-700'
-                                                        }`}>{t.status.replace(/_/g, ' ').toUpperCase()}</span>
-                                                    <span className="text-xs text-gray-500 font-mono">{t.transferId}</span>
-                                                    {t.status === 'requested' && <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full font-bold">ACTION NEEDED</span>}
+                                {transfers.filter(t => orgTransfersSubTab === 'pending' ? t.status === 'requested' : t.status !== 'requested').map(t => {
+                                    const colorClasses = t.status === 'hospital_approved' || t.status === 'admin_approved'
+                                        ? { border: 'border-green-500', badge: 'bg-green-100 text-green-700' }
+                                        : t.status === 'requested'
+                                            ? { border: 'border-yellow-500', badge: 'bg-yellow-100 text-yellow-700' }
+                                            : t.status === 'org_approved'
+                                                ? { border: 'border-blue-500', badge: 'bg-blue-100 text-blue-700' }
+                                                : { border: 'border-red-500', badge: 'bg-red-100 text-red-700' };
+                                    return (
+                                        <div key={t._id} className={`bg-white rounded-lg shadow p-4 border-l-4 ${colorClasses.border}`}>
+                                            <div className="flex items-start justify-between gap-3">
+                                                <div className="flex-1">
+                                                    <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${colorClasses.badge}`}>{t.status.replace(/_/g, ' ').toUpperCase()}</span>
+                                                        <span className="text-xs text-gray-500 font-mono">{t.transferId}</span>
+                                                        {t.status === 'requested' && <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full font-bold">ACTION NEEDED</span>}
+                                                    </div>
+                                                    <p className="font-semibold text-gray-800">Hospital: {t.hospital?.hospitalName}</p>
+                                                    <div className="flex flex-wrap gap-2 mt-2">
+                                                        {t.items.map((item, idx) => (
+                                                            <span key={idx} className="bg-red-50 border border-red-200 text-red-700 text-xs px-2 py-1 rounded font-semibold">
+                                                                {item.bloodGroup}: {item.quantity} units
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                    {t.notes && <p className="text-xs text-gray-500 mt-1">Notes: {t.notes}</p>}
+                                                    {t.status === 'org_approved' && <p className="text-xs text-blue-700 font-semibold mt-1">📤 OUT recorded — your stock has decreased. Waiting for the hospital to confirm receipt.</p>}
+                                                    {(t.status === 'hospital_approved' || t.status === 'admin_approved') && <p className="text-xs text-green-700 font-semibold mt-1">✅ OUT to hospital — deducted from your stock, hospital confirmed IN on their side.</p>}
+                                                    {t.status === 'org_rejected' && <p className="text-xs text-red-600 mt-1">Rejected: {t.orgRejectionReason}</p>}
+                                                    {t.status === 'hospital_rejected' && <p className="text-xs text-red-600 mt-1">Hospital rejected: {t.hospitalRejectionReason} — stock has been returned to you.</p>}
+                                                    <p className="text-xs text-gray-400 mt-1">{fmtDate(t.createdAt)}</p>
                                                 </div>
-                                                <p className="font-semibold text-gray-800">Hospital: {t.hospital?.hospitalName}</p>
-                                                <div className="flex flex-wrap gap-2 mt-2">
-                                                    {t.items.map((item, idx) => (
-                                                        <span key={idx} className="bg-red-50 border border-red-200 text-red-700 text-xs px-2 py-1 rounded font-semibold">
-                                                            {item.bloodGroup}: {item.quantity} units
-                                                        </span>
-                                                    ))}
+                                                <div className="flex flex-col gap-2 flex-shrink-0">
+                                                    {t.status === 'requested' && (
+                                                        <>
+                                                            <button onClick={() => handleOrgViewRequest(t)}
+                                                                className="px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-xs font-semibold">
+                                                                🔍 Review & Approve
+                                                            </button>
+                                                            <button onClick={() => { setOrgRejectId(t._id); setOrgRejectReason(''); }}
+                                                                className="px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 text-xs font-semibold">
+                                                                ❌ Reject
+                                                            </button>
+                                                        </>
+                                                    )}
                                                 </div>
-                                                {t.notes && <p className="text-xs text-gray-500 mt-1">Notes: {t.notes}</p>}
-                                                {t.status === 'completed' && <p className="text-xs text-green-700 font-semibold mt-1">✅ Stock deducted from your inventory & added to hospital</p>}
-                                                {t.status === 'org_rejected' && <p className="text-xs text-red-600 mt-1">Rejected: {t.orgRejectionReason}</p>}
-                                                <p className="text-xs text-gray-400 mt-1">{fmtDate(t.createdAt)}</p>
-                                            </div>
-                                            <div className="flex flex-col gap-2 flex-shrink-0">
-                                                {t.status === 'requested' && (
-                                                    <>
-                                                        <button onClick={() => handleOrgViewRequest(t)}
-                                                            className="px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-xs font-semibold">
-                                                            🔍 Review & Approve
-                                                        </button>
-                                                        <button onClick={() => { setOrgRejectId(t._id); setOrgRejectReason(''); }}
-                                                            className="px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 text-xs font-semibold">
-                                                            ❌ Reject
-                                                        </button>
-                                                    </>
-                                                )}
                                             </div>
                                         </div>
-                                    </div>
-                                ))}
-                                {transfers.length === 0 && (
+                                    );
+                                })}
+                                {transfers.filter(t => orgTransfersSubTab === 'pending' ? t.status === 'requested' : t.status !== 'requested').length === 0 && (
                                     <div className="bg-white rounded-lg shadow p-12 text-center text-gray-500">
                                         <i className="fa fa-exchange-alt text-5xl text-gray-200 mb-3 block"></i>
-                                        <p>No transfers yet</p>
+                                        <p>{orgTransfersSubTab === 'pending' ? 'No pending requests' : 'No transfer records yet'}</p>
                                     </div>
                                 )}
                             </div>
@@ -726,7 +883,7 @@ export default function OrganisationDashboard() {
                     {/* ── NOTIFICATIONS TAB ─────────────────────────── */}
                     {activeTab === 'notifications' && (
                         <div>
-                            <h2 className="text-xl font-bold text-gray-800 mb-4">Notifications ({notifCount})</h2>
+                            <h2 className="text-xl font-bold text-gray-800 mb-4">Notifications</h2>
                             <div className="space-y-3">
                                 {campNotifications.map(c => (
                                     <div key={c._id} className="bg-white rounded-lg shadow p-4 border-l-4 border-blue-500 flex items-start gap-3">
@@ -754,6 +911,142 @@ export default function OrganisationDashboard() {
                                         <p>No notifications</p>
                                     </div>
                                 )}
+                            </div>
+                        </div>
+                    )}
+                    {activeTab === 'profile' && (
+                        <div className="max-w-2xl space-y-6">
+                            <div className="bg-white rounded-xl shadow p-6">
+                                <h2 className="text-xl font-bold mb-4 text-gray-800 flex items-center gap-2">
+                                    <i className="fa fa-user-gear text-red-600"></i> Profile
+                                </h2>
+                                <form onSubmit={handleProfileSave} className="space-y-4">
+                                    <div>
+                                        <label className="block text-gray-700 font-semibold mb-2">Organisation Name</label>
+                                        <input
+                                            type="text"
+                                            name="organisationName"
+                                            value={profileForm.organisationName}
+                                            onChange={handleProfileChange}
+                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-gray-700 font-semibold mb-2">Phone Number</label>
+                                        <input
+                                            type="tel"
+                                            name="phone"
+                                            value={profileForm.phone}
+                                            onChange={handleProfileChange}
+                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none"
+                                        />
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        <div>
+                                            <label className="block text-gray-700 font-semibold mb-2">State</label>
+                                            <select
+                                                name="state"
+                                                value={profileForm.state}
+                                                onChange={handleProfileChange}
+                                                className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-red-500 outline-none"
+                                            >
+                                                <option value="">Select State</option>
+                                                {profileStates.map((s, i) => <option key={i} value={s.state}>{s.state}</option>)}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-gray-700 font-semibold mb-2">District</label>
+                                            <select
+                                                name="district"
+                                                value={profileForm.district}
+                                                onChange={handleProfileChange}
+                                                disabled={!profileForm.state}
+                                                className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white disabled:bg-gray-100 focus:ring-2 focus:ring-red-500 outline-none"
+                                            >
+                                                <option value="">Select District</option>
+                                                {profileDistricts.map((d, i) => <option key={i} value={d.DIST_name}>{d.DIST_name}</option>)}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-gray-700 font-semibold mb-2">City</label>
+                                            <select
+                                                name="city"
+                                                value={profileForm.city}
+                                                onChange={handleProfileChange}
+                                                disabled={!profileForm.district}
+                                                className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white disabled:bg-gray-100 focus:ring-2 focus:ring-red-500 outline-none"
+                                            >
+                                                <option value="">Select City</option>
+                                                {profileCities.map((c, i) => <option key={i} value={c}>{c}</option>)}
+                                            </select>
+                                        </div>
+                                    </div>
+                                    {profileMessage && (
+                                        <p className={`text-sm ${profileMessage.startsWith('✅') ? 'text-green-600' : 'text-red-600'}`}>{profileMessage}</p>
+                                    )}
+                                    <button
+                                        type="submit"
+                                        disabled={profileSaving}
+                                        className="px-6 py-2 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition disabled:opacity-50"
+                                    >
+                                        {profileSaving ? 'Saving...' : 'Update Profile'}
+                                    </button>
+                                </form>
+                            </div>
+
+                            <div className="bg-white rounded-xl shadow p-6">
+                                <h2 className="text-xl font-bold mb-4 text-gray-800 flex items-center gap-2">
+                                    <i className="fa fa-lock text-red-600"></i> Reset Password
+                                </h2>
+                                <form onSubmit={handlePasswordSave} className="space-y-4">
+                                    <div>
+                                        <label className="block text-gray-700 font-semibold mb-2">Current Password</label>
+                                        <input
+                                            type="password"
+                                            name="currentPassword"
+                                            value={passwordForm.currentPassword}
+                                            onChange={handlePasswordChange}
+                                            required
+                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none"
+                                        />
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-gray-700 font-semibold mb-2">New Password</label>
+                                            <input
+                                                type="password"
+                                                name="newPassword"
+                                                value={passwordForm.newPassword}
+                                                onChange={handlePasswordChange}
+                                                required
+                                                minLength={6}
+                                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-gray-700 font-semibold mb-2">Confirm New Password</label>
+                                            <input
+                                                type="password"
+                                                name="confirmNewPassword"
+                                                value={passwordForm.confirmNewPassword}
+                                                onChange={handlePasswordChange}
+                                                required
+                                                minLength={6}
+                                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none"
+                                            />
+                                        </div>
+                                    </div>
+                                    {passwordMessage && (
+                                        <p className={`text-sm ${passwordMessage.startsWith('✅') ? 'text-green-600' : 'text-red-600'}`}>{passwordMessage}</p>
+                                    )}
+                                    <button
+                                        type="submit"
+                                        disabled={passwordSaving}
+                                        className="px-6 py-2 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition disabled:opacity-50"
+                                    >
+                                        {passwordSaving ? 'Saving...' : 'Change Password'}
+                                    </button>
+                                </form>
                             </div>
                         </div>
                     )}
@@ -823,7 +1116,7 @@ export default function OrganisationDashboard() {
                         </div>
                         <div className="p-6 space-y-4">
                             <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 text-xs text-orange-800">
-                                <i className="fa fa-info-circle mr-1"></i> For donors who are <strong>not registered</strong> in the system. This record will appear in Admin's unverified section.
+                                <i className="fa fa-info-circle mr-1"></i> For donors who are <strong>not registered</strong> in the system. This will be added to your own stock right away.
                             </div>
                             <div>
                                 <label className="block text-sm font-semibold text-gray-700 mb-1">Donor Name *</label>
@@ -884,7 +1177,7 @@ export default function OrganisationDashboard() {
                                         });
                                         const data = await res.json();
                                         if (data.success) {
-                                            alert('Walk-in donation recorded! ✅\nThis will appear in Admin\'s unverified section for review.');
+                                            alert('✅ Walk-in donation recorded! Added to your blood stock.');
                                             setShowWalkinModal(false);
                                             setWalkinForm({ donorName: '', campName: '', bloodGroup: '', quantity: '', expiryDate: '' });
                                             fetchAll();
@@ -1072,7 +1365,7 @@ export default function OrganisationDashboard() {
                             </div>
 
                             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-xs text-yellow-800">
-                                <i className="fa fa-info-circle mr-1"></i> Hospital must approve this transfer. Once approved, records are automatically added to both dashboards.
+                                <i className="fa fa-info-circle mr-1"></i> This completes immediately on your side — your stock decreases now. The hospital will be notified to add their own record.
                             </div>
 
                             <div className="flex gap-3">
@@ -1086,7 +1379,7 @@ export default function OrganisationDashboard() {
                                     const data = await transferAPI.create({ hospitalId: transferForm.hospitalId, items: transferForm.items, notes: transferForm.notes });
                                     setTransferSaving(false);
                                     if (data.success) {
-                                        alert('Transfer sent! Awaiting hospital approval.');
+                                        alert('✅ Sent! Your stock has decreased. The hospital has been notified to add their own record.');
                                         setShowTransferModal(false);
                                         setTransferForm({ hospitalId: '', notes: '', items: [{ bloodGroup: '', quantity: '', expiryDate: '' }] });
                                         fetchTransfers();
@@ -1112,7 +1405,7 @@ function RecordsTable({ inventory, onEdit, fmtDate }) {
         <div className="bg-white rounded-lg shadow overflow-x-auto">
             <table className="w-full text-sm">
                 <thead className="bg-gray-50">
-                    <tr>{['Type', 'Donor/Hospital', 'Blood', 'Units', 'Expiry', 'Date', 'Status', 'Edit'].map(h => (
+                    <tr>{['Type', 'Details', 'Blood', 'Units', 'Expiry', 'Date', 'Status', 'Edit'].map(h => (
                         <th key={h} className="p-3 text-left text-gray-600">{h}</th>
                     ))}</tr>
                 </thead>
@@ -1120,14 +1413,22 @@ function RecordsTable({ inventory, onEdit, fmtDate }) {
                     {inventory.map(item => {
                         const expired = item.status === 'expired' || new Date(item.expiryDate) < new Date();
                         const expiringSoon = !expired && new Date(item.expiryDate) < new Date(Date.now() + 5 * 86400000);
+                        const counterparty = item.donor?.name || item.hospital?.hospitalName || item.source_name || item.target_name || 'N/A';
                         return (
                             <tr key={item._id} className={`border-b hover:bg-gray-50 ${expired ? 'bg-red-50' : expiringSoon ? 'bg-orange-50' : ''}`}>
                                 <td className="p-3">
                                     <span className={`px-2 py-0.5 rounded text-xs font-semibold ${item.inventoryType === 'in' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                                        {item.inventoryType === 'in' ? '📥 IN' : '📤 OUT'}
+                                        {item.inventoryType === 'in' ? 'IN' : 'OUT'}
                                     </span>
                                 </td>
-                                <td className="p-3 truncate max-w-32">{item.donor?.name || item.hospital?.hospitalName || item.source_name || item.target_name || 'N/A'}</td>
+                                <td className="p-3 truncate max-w-40">
+                                    {item.inventoryType === 'in'
+                                        ? <span>IN <span className="text-gray-500">from</span> <strong>{counterparty}</strong></span>
+                                        : <span>OUT <span className="text-gray-500">to</span> <strong>{counterparty}</strong></span>}
+                                    {item.notes && !item.notes.startsWith('Transfer ') && (
+                                        <div className="text-xs text-gray-400 truncate">{item.notes}</div>
+                                    )}
+                                </td>
                                 <td className="p-3 font-bold text-red-600">{item.bloodGroup}</td>
                                 <td className="p-3 font-semibold">{item.quantity}</td>
                                 <td className="p-3">

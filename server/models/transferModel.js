@@ -40,6 +40,8 @@ const transferSchema = new mongoose.Schema({
     hospitalApprovedAt: { type: Date, default: null },
     hospitalRejectionReason: { type: String, default: '' },
 
+    hospitalAcknowledged: { type: Boolean, default: false },
+
     adminApprovedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'user', default: null },
     adminApprovedAt: { type: Date, default: null },
     adminRejectionReason: { type: String, default: '' },

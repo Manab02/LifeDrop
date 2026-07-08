@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { X, FileText, Eye, Trash2, CheckCircle, XCircle, AlertTriangle, Clock } from 'lucide-react';
+import { X, FileText, Eye, Trash2, CheckCircle, XCircle, Clock } from 'lucide-react';
 import { authAPI, adminAPI, transferAPI } from '../services/api';
 import EditInventoryModal from '../components/EditInventoryModal';
 
 
 const AdminDashboard = () => {
   const [user, setUser] = useState(null);
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState(() => sessionStorage.getItem('admin_active_tab') || 'dashboard');
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [selectedBloodGroup, setSelectedBloodGroup] = useState(null);
@@ -14,6 +14,20 @@ const AdminDashboard = () => {
   const [pendingTransfers, setPendingTransfers] = useState([]);
   const [rejectTransferId, setRejectTransferId] = useState(null);
   const [showIDs, setShowIDs] = useState(false);
+
+  // Inventory tab: donor / hospital / organisation browser
+  const [inventorySubTab, setInventorySubTab] = useState('hospitals'); // 'donors' | 'hospitals' | 'organisations'
+  const [selectedInvEntity, setSelectedInvEntity] = useState(null); // { type, id, name }
+  const [entityListSearch, setEntityListSearch] = useState('');
+  const [entityTxSearch, setEntityTxSearch] = useState('');
+
+  // Low stock tab: blood-group wise breakdown
+  const [selectedLowStockGroup, setSelectedLowStockGroup] = useState(null);
+
+  // Search boxes for the Hospitals / Organisations / Donors management tabs
+  const [hospitalsSearch, setHospitalsSearch] = useState('');
+  const [organisationsSearch, setOrganisationsSearch] = useState('');
+  const [donorsSearch, setDonorsSearch] = useState('');
 
   // Modals
   const [showDocModal, setShowDocModal] = useState(false);
@@ -44,7 +58,6 @@ const AdminDashboard = () => {
   const [donors, setDonors] = useState([]);
   const [hospitals, setHospitals] = useState([]);
   const [organisations, setOrganisations] = useState([]);
-  const [unverifiedEntries, setUnverifiedEntries] = useState([]);
   const [pendingTransactions, setPendingTransactions] = useState([]);
   const [expiryWarnings, setExpiryWarnings] = useState([]);
   const [lowStockAlerts, setLowStockAlerts] = useState([]);
@@ -81,7 +94,6 @@ const AdminDashboard = () => {
         donorsRes,
         hospitalsRes,
         orgsRes,
-        unverifiedRes,
         pendingRes,
         expiryRes,
         lowStockRes
@@ -91,9 +103,6 @@ const AdminDashboard = () => {
         adminAPI.getDonorList(),
         adminAPI.getHospitalList(),
         adminAPI.getOrgList(),
-        fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:7000'}/api/admin/unverified-entries`, {
-          credentials: 'include'
-        }).then(r => r.json()),
         fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:7000'}/api/admin/pending-transactions`, {
           credentials: 'include'
         }).then(r => r.json()),
@@ -110,7 +119,6 @@ const AdminDashboard = () => {
       if (donorsRes.success) setDonors(donorsRes.data || []);
       if (hospitalsRes.success) setHospitals(hospitalsRes.data || []);
       if (orgsRes.success) setOrganisations(orgsRes.data || []);
-      if (unverifiedRes.success) setUnverifiedEntries(unverifiedRes.data || []);
       if (pendingRes.success) setPendingTransactions(pendingRes.data || []);
       if (expiryRes.success) setExpiryWarnings(expiryRes.warnings || []);
       if (lowStockRes.success) setLowStockAlerts(lowStockRes.alerts || []);
@@ -127,16 +135,31 @@ const AdminDashboard = () => {
     try {
       await authAPI.logout();
       localStorage.removeItem('user');
-      window.location.href = '/login';
+      window.location.replace('/login');
     } catch (error) {
       console.error('Logout error:', error);
-      window.location.href = '/login';
+      localStorage.removeItem('user');
+      window.location.replace('/login');
     }
   };
 
   const fetchPendingTransfers = async () => {
     const data = await transferAPI.adminPending();
     if (data.success) setPendingTransfers(data.transfers || []);
+  };
+
+  // Switching sidebar sections should always show fresh data,
+  // not whatever was fetched on the initial page load.
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+    sessionStorage.setItem('admin_active_tab', tab);
+    setSidebarOpen(false);
+    setSelectedInvEntity(null);
+    setEntityListSearch('');
+    setEntityTxSearch('');
+    setSelectedLowStockGroup(null);
+    fetchAllData();
+    fetchPendingTransfers();
   };
 
   const fetchBloodGroupDetails = async (group) => {
@@ -321,29 +344,6 @@ const AdminDashboard = () => {
     }
   };
 
-  //  Verify Manual Entry
-  const handleVerifyEntry = async (id) => {
-    if (!window.confirm('Verify this manual entry?')) return;
-
-    try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:7000'}/api/admin/verify-entry/${id}`, {
-        method: 'POST',
-        credentials: 'include'
-      });
-      const data = await response.json();
-
-      if (data.success) {
-        alert('Entry verified successfully!');
-        fetchAllData();
-      } else {
-        alert(data.message || 'Verification failed');
-      }
-    } catch (error) {
-      console.error('Verify entry error:', error);
-      alert('An error occurred');
-    }
-  };
-
   // Run Manual Expiry Check
   const handleRunExpiryCheck = async () => {
     if (!window.confirm('Run manual expiry check now?')) return;
@@ -388,32 +388,29 @@ const AdminDashboard = () => {
         </div>
 
         <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
-          <button onClick={() => { setActiveTab('dashboard'); setSidebarOpen(false); }} className={`w-full flex items-center p-3 rounded-lg transition ${activeTab === 'dashboard' ? 'bg-red-600' : 'hover:bg-red-600'}`}>
+          <button onClick={() => handleTabChange('dashboard')} className={`w-full flex items-center p-3 rounded-lg transition ${activeTab === 'dashboard' ? 'bg-red-600' : 'hover:bg-red-600'}`}>
             <i className="fa fa-gauge w-6"></i> Dashboard
           </button>
-          <button onClick={() => { setActiveTab('inventory'); setSidebarOpen(false); }} className={`w-full flex items-center p-3 rounded-lg transition ${activeTab === 'inventory' ? 'bg-red-600' : 'hover:bg-red-600'}`}>
+          <button onClick={() => handleTabChange('inventory')} className={`w-full flex items-center p-3 rounded-lg transition ${activeTab === 'inventory' ? 'bg-red-600' : 'hover:bg-red-600'}`}>
             <i className="fa fa-vials w-6"></i> Inventory ({inventory.length})
           </button>
 
-          <button onClick={() => { setActiveTab('unverified'); setSidebarOpen(false); }} className={`w-full flex items-center p-3 rounded-lg transition ${activeTab === 'unverified' ? 'bg-red-600' : 'hover:bg-red-600'}`}>
-            <i className="fa fa-exclamation-triangle w-6"></i> Unverified ({stats.unverifiedEntries})
+          <button onClick={() => handleTabChange('pending')} className={`w-full flex items-center p-3 rounded-lg transition ${activeTab === 'pending' ? 'bg-red-600' : 'hover:bg-red-600'}`}>
+            <i className="fa fa-clock w-6"></i> Pending ({pendingTransfers.length})
           </button>
-          <button onClick={() => { setActiveTab('pending'); setSidebarOpen(false); }} className={`w-full flex items-center p-3 rounded-lg transition ${activeTab === 'pending' ? 'bg-red-600' : 'hover:bg-red-600'}`}>
-            <i className="fa fa-clock w-6"></i> Pending ({stats.pendingTransactions})
-          </button>
-          <button onClick={() => { setActiveTab('expiry'); setSidebarOpen(false); }} className={`w-full flex items-center p-3 rounded-lg transition ${activeTab === 'expiry' ? 'bg-red-600' : 'hover:bg-red-600'}`}>
+          <button onClick={() => handleTabChange('expiry')} className={`w-full flex items-center p-3 rounded-lg transition ${activeTab === 'expiry' ? 'bg-red-600' : 'hover:bg-red-600'}`}>
             <i className="fa fa-calendar-times w-6"></i> Expiry ({stats.expiringItemsCount})
           </button>
-          <button onClick={() => { setActiveTab('lowstock'); setSidebarOpen(false); }} className={`w-full flex items-center p-3 rounded-lg transition ${activeTab === 'lowstock' ? 'bg-red-600' : 'hover:bg-red-600'}`}>
+          <button onClick={() => handleTabChange('lowstock')} className={`w-full flex items-center p-3 rounded-lg transition ${activeTab === 'lowstock' ? 'bg-red-600' : 'hover:bg-red-600'}`}>
             <i className="fa fa-chart-line w-6"></i> Low Stock ({stats.lowStockGroups.length})
           </button>
-          <button onClick={() => { setActiveTab('hospitals'); setSidebarOpen(false); }} className={`w-full flex items-center p-3 rounded-lg transition ${activeTab === 'hospitals' ? 'bg-red-600' : 'hover:bg-red-600'}`}>
+          <button onClick={() => handleTabChange('hospitals')} className={`w-full flex items-center p-3 rounded-lg transition ${activeTab === 'hospitals' ? 'bg-red-600' : 'hover:bg-red-600'}`}>
             <i className="fa fa-hospital w-6"></i> Hospitals ({hospitals.filter(h => h.approvalStatus === 'pending').length})
           </button>
-          <button onClick={() => { setActiveTab('organisations'); setSidebarOpen(false); }} className={`w-full flex items-center p-3 rounded-lg transition ${activeTab === 'organisations' ? 'bg-red-600' : 'hover:bg-red-600'}`}>
+          <button onClick={() => handleTabChange('organisations')} className={`w-full flex items-center p-3 rounded-lg transition ${activeTab === 'organisations' ? 'bg-red-600' : 'hover:bg-red-600'}`}>
             <i className="fa fa-building w-6"></i> Organizations ({organisations.filter(o => o.approvalStatus === 'pending').length})
           </button>
-          <button onClick={() => { setActiveTab('donors'); setSidebarOpen(false); }} className={`w-full flex items-center p-3 rounded-lg transition ${activeTab === 'donors' ? 'bg-red-600' : 'hover:bg-red-600'}`}>
+          <button onClick={() => handleTabChange('donors')} className={`w-full flex items-center p-3 rounded-lg transition ${activeTab === 'donors' ? 'bg-red-600' : 'hover:bg-red-600'}`}>
             <i className="fa fa-users w-6"></i> Donors ({donors.length})
           </button>
         </nav>
@@ -501,17 +498,7 @@ const AdminDashboard = () => {
                 </div>
 
                 {/*  Alert Cards */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                  <div className="bg-white p-6 rounded-xl shadow-lg border-l-4 border-yellow-500">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm text-gray-600 mb-1">Unverified Entries</p>
-                        <p className="text-3xl font-bold text-yellow-600">{stats.unverifiedEntries}</p>
-                      </div>
-                      <AlertTriangle className="w-10 h-10 text-yellow-500" />
-                    </div>
-                  </div>
-
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
                   <div className="bg-white p-6 rounded-xl shadow-lg border-l-4 border-blue-500">
                     <div className="flex items-center justify-between">
                       <div>
@@ -648,88 +635,6 @@ const AdminDashboard = () => {
               </>
             )}
 
-            {/*  Unverified Entries Tab */}
-            {activeTab === 'unverified' && (
-              <div className="bg-white rounded-xl shadow-lg p-6">
-                <h2 className="text-2xl font-bold text-gray-800 mb-4 flex items-center gap-2">
-                  <AlertTriangle className="w-6 h-6 text-yellow-600" />
-                  Unverified Entries ({unverifiedEntries.length})
-                </h2>
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
-                  <p className="text-sm text-yellow-800">
-                    <strong>ℹ️ Note:</strong> These are manual entries without registered entity IDs. Review and verify them.</p>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead className="bg-gray-100">
-                      <tr>
-                        <th className="p-3 text-left text-sm">Transaction ID</th>
-                        <th className="p-3 text-left text-sm">Type</th>
-                        <th className="p-3 text-left text-sm">Blood Group</th>
-                        <th className="p-3 text-left text-sm">Quantity</th>
-                        <th className="p-3 text-left text-sm">Source</th>
-                        <th className="p-3 text-left text-sm">Target</th>
-                        <th className="p-3 text-left text-sm">Expiry Date</th>
-                        <th className="p-3 text-left text-sm">Date</th>
-                        <th className="p-3 text-left text-sm">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {unverifiedEntries.map((item, idx) => (
-                        <tr key={item._id} className={idx % 2 === 0 ? 'bg-gray-50' : ''}>
-                          <td className="p-3 text-xs font-mono text-gray-600">{item.transactionId}</td>
-                          <td className="p-3">
-                            <span className={`px-2 py-1 rounded text-xs font-semibold ${item.inventoryType === 'in' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                              {item.inventoryType.toUpperCase()}
-                            </span>
-                          </td>
-                          <td className="p-3 font-bold text-red-600">{item.bloodGroup}</td>
-                          <td className="p-3">{item.quantity}</td>
-                          <td className="p-3 text-sm">
-                            {item.source_name || item.donor?.name || 'Unknown'}
-                          </td>
-                          <td className="p-3 text-sm">
-                            {item.target_name || item.hospital?.hospitalName || item.organisation?.organisationName || 'Unknown'}
-                          </td>
-                          <td className="p-3 text-sm">{new Date(item.expiryDate).toLocaleDateString()}</td>
-                          <td className="p-3 text-xs text-gray-600">{new Date(item.createdAt).toLocaleDateString()}</td>
-                          <td className="p-3">
-                            <div className="flex gap-2">
-                              <button
-                                onClick={() => handleVerifyEntry(item._id)}
-                                className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 text-xs"
-                              >
-                                ✓ Verify
-                              </button>
-                              <button
-                                onClick={() => handleEdit(item)}
-                                className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-xs"
-                              >
-                                Edit
-                              </button>
-                              <button
-                                onClick={() => handleDelete(item._id, 'inventory')}
-                                className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-xs"
-                              >
-                                Delete
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                      {unverifiedEntries.length === 0 && (
-                        <tr>
-                          <td colSpan="9" className="p-6 text-center text-gray-500">
-                            No unverified entries found
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-
             {/* Pending Blood Transfers — Admin steps in */}
             {activeTab === 'pending' && (
               <div className="bg-white rounded-xl shadow-lg p-6">
@@ -837,11 +742,11 @@ const AdminDashboard = () => {
               <div className="bg-white rounded-xl shadow-lg p-6">
                 <h2 className="text-2xl font-bold text-gray-800 mb-4 flex items-center gap-2">
                   <i className="fa fa-chart-line text-red-600"></i>
-                  Low Stock Alerts ({lowStockAlerts.length})
+                  Low Stock — By Blood Group
                 </h2>
                 <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
                   <p className="text-sm text-red-800">
-                    <strong>🚨 Alert:</strong> The following facilities have low blood stock.
+                    <strong>🚨 Alert:</strong> Click a blood group to see which hospitals & organisations are running low.
                   </p>
                 </div>
                 {lowStockAlerts.length === 0 ? (
@@ -849,35 +754,38 @@ const AdminDashboard = () => {
                     All facilities have adequate stock
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {lowStockAlerts.map((alert, idx) => (
-                      <div key={idx} className={`rounded-lg p-4 border-l-4 shadow ${alert.severity === 'critical' ? 'bg-red-50 border-red-500' :
-                        alert.severity === 'high' ? 'bg-orange-50 border-orange-500' :
-                          'bg-yellow-50 border-yellow-500'
-                        }`}>
-                        <div className="flex items-center justify-between mb-2">
-                          <span className={`px-2 py-1 rounded text-xs font-bold ${alert.severity === 'critical' ? 'bg-red-600 text-white' :
-                            alert.severity === 'high' ? 'bg-orange-600 text-white' :
-                              'bg-yellow-600 text-white'
-                            }`}>
-                            {alert.severity.toUpperCase()}
-                          </span>
-                          <i className={`fa ${alert.type === 'hospital' ? 'fa-hospital' : 'fa-building'} text-2xl ${alert.severity === 'critical' ? 'text-red-600' :
-                            alert.severity === 'high' ? 'text-orange-600' :
-                              'text-yellow-600'
-                            }`}></i>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                    {['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'].map(group => {
+                      const groupAlerts = lowStockAlerts.filter(a => a.bloodGroup === group);
+                      const hasCritical = groupAlerts.some(a => a.severity === 'critical');
+                      const hasHigh = groupAlerts.some(a => a.severity === 'high');
+                      const borderColor = groupAlerts.length === 0 ? 'border-gray-200' : hasCritical ? 'border-red-500' : hasHigh ? 'border-orange-500' : 'border-yellow-500';
+                      const bgColor = groupAlerts.length === 0 ? 'bg-gray-50' : hasCritical ? 'bg-red-50' : hasHigh ? 'bg-orange-50' : 'bg-yellow-50';
+
+                      return (
+                        <div
+                          key={group}
+                          onClick={() => groupAlerts.length > 0 && setSelectedLowStockGroup(group)}
+                          className={`rounded-lg p-4 border-2 text-center shadow ${borderColor} ${bgColor} ${groupAlerts.length > 0 ? 'cursor-pointer hover:shadow-md transition' : 'opacity-60'}`}
+                        >
+                          <div className="text-2xl font-bold text-red-600">{group}</div>
+                          {groupAlerts.length === 0 ? (
+                            <p className="text-xs text-gray-500 mt-2">No low stock</p>
+                          ) : (
+                            <>
+                              <p className="text-3xl font-bold text-gray-800 mt-1">{groupAlerts.length}</p>
+                              <p className="text-xs text-gray-600">
+                                facilit{groupAlerts.length === 1 ? 'y' : 'ies'} low
+                              </p>
+                              <span className={`inline-block mt-2 text-xs font-bold px-2 py-1 rounded ${hasCritical ? 'bg-red-600 text-white' : hasHigh ? 'bg-orange-600 text-white' : 'bg-yellow-600 text-white'}`}>
+                                {hasCritical ? 'CRITICAL' : hasHigh ? 'HIGH' : 'MEDIUM'}
+                              </span>
+                              <p className="text-xs text-gray-400 mt-1">Click for details</p>
+                            </>
+                          )}
                         </div>
-                        <h3 className="font-bold text-gray-800 mb-1">{alert.name}</h3>
-                        {showIDs && <p className="text-xs text-gray-500 mb-2">ID: {alert.systemId}</p>}
-                        <div className="flex items-center justify-between">
-                          <span className="text-2xl font-bold text-red-600">{alert.bloodGroup}</span>
-                          <div className="text-right">
-                            <div className="text-xl font-bold text-gray-800">{alert.currentStock} units</div>
-                            <div className="text-xs text-gray-600">Threshold: {alert.threshold}</div>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -887,96 +795,293 @@ const AdminDashboard = () => {
             {activeTab === 'inventory' && (
               <div className="bg-white rounded-xl shadow-lg p-6">
                 <h2 className="text-2xl font-bold text-gray-800 mb-4">
-                  All Inventory Records ({inventory.length})
+                  Inventory by Category
                 </h2>
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead className="bg-gray-100">
-                      <tr>
-                        <th className="p-3 text-left text-sm">TX ID</th>
-                        <th className="p-3 text-left text-sm">Type</th>
-                        <th className="p-3 text-left text-sm">Blood</th>
-                        <th className="p-3 text-left text-sm">Qty</th>
-                        <th className="p-3 text-left text-sm">Donor</th>
-                        <th className="p-3 text-left text-sm">Hospital</th>
-                        <th className="p-3 text-left text-sm">Org</th>
-                        {showIDs && <th className="p-3 text-left text-sm">System ID</th>}
-                        <th className="p-3 text-left text-sm">Expiry</th>
-                        <th className="p-3 text-left text-sm">Date</th>
-                        <th className="p-3 text-left text-sm">Status</th>
-                        <th className="p-3 text-left text-sm">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {inventory.map((item, idx) => {
-                        const isExpired = item.status === 'expired' || new Date(item.expiryDate) < new Date();
-                        const isExpiringSoon = !isExpired && new Date(item.expiryDate) < new Date(Date.now() + 5 * 24 * 60 * 60 * 1000);
 
-                        return (
-                          <tr key={item._id} className={`${idx % 2 === 0 ? 'bg-gray-50' : ''} ${isExpired ? 'opacity-60' : ''}`}>
-                            <td className="p-3 text-xs font-mono text-gray-600">{item.transactionId?.slice(-8)}</td>
-                            <td className="p-3">
-                              <div className="flex flex-col gap-1">
-                                <span className={`px-2 py-1 rounded text-xs font-semibold ${item.inventoryType === 'in' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                                  {item.inventoryType.toUpperCase()}
-                                </span>
-                                {!item.verified && (
-                                  <span className="px-2 py-1 rounded text-xs bg-yellow-100 text-yellow-700">Manual</span>
-                                )}
-                              </div>
-                            </td>
-                            <td className="p-3 font-bold text-red-600">{item.bloodGroup}</td>
-                            <td className="p-3">{item.quantity}</td>
-                            <td className="p-3 text-sm">{item.donor?.name || '-'}</td>
-                            <td className="p-3 text-sm">{item.hospital?.hospitalName || '-'}</td>
-                            <td className="p-3 text-sm">{item.organisation?.organisationName || '-'}</td>
-                            {showIDs && (
-                              <td className="p-3 text-xs text-gray-600">
-                                {item.hospital?.systemId || item.organisation?.systemId || '-'}
-                              </td>
-                            )}
-                            <td className="p-3">
-                              <span className={isExpired ? 'text-red-600 font-bold text-xs' : isExpiringSoon ? 'text-orange-600 font-semibold text-xs' : 'text-gray-600 text-xs'}>
-                                {new Date(item.expiryDate).toLocaleDateString()}
-                              </span>
-                            </td>
-                            <td className="p-3 text-xs text-gray-600">
-                              {new Date(item.createdAt).toLocaleDateString()}
-                            </td>
-                            <td className="p-3">
-                              <span className={`px-2 py-1 rounded text-xs font-semibold ${item.status === 'expired' ? 'bg-red-100 text-red-700' :
-                                item.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
-                                  item.status === 'approved' ? 'bg-blue-100 text-blue-700' :
-                                    item.status === 'rejected' ? 'bg-gray-100 text-gray-700' :
-                                      'bg-green-100 text-green-700'
-                                }`}>
-                                {item.status || 'completed'}
-                              </span>
-                            </td>
-                            <td className="p-3">
-                              <div className="flex gap-2">
-                                <button
-                                  onClick={() => handleEdit(item)}
-                                  className="text-blue-600 hover:text-blue-800"
-                                  title="Edit"
-                                >
-                                  <i className="fa fa-edit w-4 h-4"></i>
-                                </button>
-                                <button
-                                  onClick={() => handleDelete(item._id, 'inventory')}
-                                  className="text-red-600 hover:text-red-800"
-                                  title="Delete"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+                {/* Sub-tabs */}
+                <div className="flex gap-2 mb-5 border-b border-gray-200">
+                  {[
+                    { key: 'hospitals', label: 'Hospitals', icon: 'fa-hospital', count: hospitals.length },
+                    { key: 'organisations', label: 'Organisations', icon: 'fa-building', count: organisations.length },
+                    { key: 'donors', label: 'Donors', icon: 'fa-users', count: donors.length },
+                  ].map(t => (
+                    <button
+                      key={t.key}
+                      onClick={() => { setInventorySubTab(t.key); setSelectedInvEntity(null); setEntityListSearch(''); }}
+                      className={`px-4 py-2 text-sm font-semibold flex items-center gap-2 border-b-2 -mb-px transition ${inventorySubTab === t.key ? 'border-red-600 text-red-600' : 'border-transparent text-gray-500 hover:text-gray-700'
+                        }`}
+                    >
+                      <i className={`fa ${t.icon}`}></i> {t.label} ({t.count})
+                    </button>
+                  ))}
                 </div>
+
+                {!selectedInvEntity ? (
+                  // ----- Entity list view: all registered names -----
+                  <>
+                    <div className="relative mb-4 max-w-sm">
+                      <i className="fa fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
+                      <input
+                        type="text"
+                        value={entityListSearch}
+                        onChange={e => setEntityListSearch(e.target.value)}
+                        placeholder={inventorySubTab === 'donors' ? 'Search donors by name or email...' : `Search ${inventorySubTab}...`}
+                        className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-red-500"
+                      />
+                    </div>
+
+                    {(() => {
+                      // Rejected hospitals/organisations are not active entities — hide them here.
+                      const list = inventorySubTab === 'hospitals' ? hospitals.filter(h => h.approvalStatus !== 'rejected')
+                        : inventorySubTab === 'organisations' ? organisations.filter(o => o.approvalStatus !== 'rejected')
+                          : donors;
+
+                      const getName = (e) => e.hospitalName || e.organisationName || e.name || 'Unnamed';
+                      const getLocation = (e) => {
+                        const city = e.address?.city;
+                        const state = e.address?.state;
+                        if (city && state) return `${city}, ${state}`;
+                        return city || state || '';
+                      };
+                      const getTxCount = (e) => inventory.filter(item => {
+                        if (inventorySubTab === 'hospitals') {
+                          if (item.hospital?._id !== e._id) return false;
+                          if (item.inventoryType === 'out') return ['hospital', 'patient', 'manual', null, undefined].includes(item.source_type);
+                          return true;
+                        }
+                        if (inventorySubTab === 'organisations') {
+                          if (item.organisation?._id !== e._id) return false;
+                          if (item.inventoryType === 'in') return item.target_type !== 'hospital';
+                          return true;
+                        }
+                        return item.donor?._id === e._id;
+                      }).length;
+
+                      const q = entityListSearch.toLowerCase();
+                      const filtered = list.filter(e => {
+                        if (inventorySubTab === 'donors') {
+                          return getName(e).toLowerCase().includes(q) || (e.email || '').toLowerCase().includes(q);
+                        }
+                        return getName(e).toLowerCase().includes(q);
+                      });
+
+                      if (filtered.length === 0) {
+                        return <p className="text-center text-gray-500 py-10">No {inventorySubTab} found</p>;
+                      }
+
+                      return (
+                        <div className="overflow-x-auto">
+                          <table className="w-full">
+                            <thead className="bg-gray-100">
+                              <tr>
+                                <th className="p-3 text-left text-sm">Name</th>
+                                {showIDs && <th className="p-3 text-left text-sm">System ID</th>}
+                                {inventorySubTab === 'donors' ? (
+                                  <th className="p-3 text-left text-sm">Email</th>
+                                ) : (
+                                  <th className="p-3 text-left text-sm">Location</th>
+                                )}
+                                {inventorySubTab !== 'donors' && <th className="p-3 text-left text-sm">Status</th>}
+                                <th className="p-3 text-left text-sm">Transactions</th>
+                                <th className="p-3 text-left text-sm">Actions</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {filtered.map((e, idx) => {
+                                const name = getName(e);
+                                const txCount = getTxCount(e);
+                                return (
+                                  <tr key={e._id} className={idx % 2 === 0 ? 'bg-gray-50' : ''}>
+                                    <td className="p-3 font-semibold">
+                                      <button
+                                        onClick={() => setSelectedInvEntity({ type: inventorySubTab, id: e._id, name })}
+                                        className="text-red-600 hover:underline text-left"
+                                      >
+                                        {name}
+                                      </button>
+                                    </td>
+                                    {showIDs && <td className="p-3 text-xs font-mono text-gray-600">{e.systemId || '-'}</td>}
+                                    {inventorySubTab === 'donors' ? (
+                                      <td className="p-3 text-sm">{e.email}</td>
+                                    ) : (
+                                      <td className="p-3 text-sm">
+                                        {getLocation(e) || <span className="text-gray-400">—</span>}
+                                      </td>
+                                    )}
+                                    {inventorySubTab !== 'donors' && (
+                                      <td className="p-3">
+                                        <span className={`px-2 py-1 rounded text-xs font-semibold ${e.approvalStatus === 'approved' ? 'bg-green-100 text-green-700' :
+                                          e.approvalStatus === 'rejected' ? 'bg-red-100 text-red-700' :
+                                            'bg-yellow-100 text-yellow-700'
+                                          }`}>
+                                          {e.approvalStatus}
+                                        </span>
+                                      </td>
+                                    )}
+                                    <td className="p-3 text-sm">{txCount} record{txCount !== 1 ? 's' : ''}</td>
+                                    <td className="p-3">
+                                      <button
+                                        onClick={() => setSelectedInvEntity({ type: inventorySubTab, id: e._id, name })}
+                                        className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-xs"
+                                      >
+                                        View Transactions
+                                      </button>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      );
+                    })()}
+                  </>
+                ) : (
+                  // ----- Entity detail view: own transaction records -----
+                  <>
+                    <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
+                      <div>
+                        <button
+                          onClick={() => { setSelectedInvEntity(null); setEntityTxSearch(''); }}
+                          className="text-sm text-gray-500 hover:text-gray-700 mb-1 flex items-center gap-1"
+                        >
+                          <i className="fa fa-arrow-left"></i> Back to {inventorySubTab}
+                        </button>
+                        <h3 className="text-xl font-bold text-gray-800">{selectedInvEntity.name}</h3>
+                      </div>
+                      <div className="relative max-w-xs w-full">
+                        <i className="fa fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
+                        <input
+                          type="text"
+                          value={entityTxSearch}
+                          onChange={e => setEntityTxSearch(e.target.value)}
+                          placeholder="Search by blood group, TX ID, status..."
+                          className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-red-500"
+                        />
+                      </div>
+                    </div>
+
+                    {(() => {
+                      let txs = inventory.filter(item => {
+                        if (selectedInvEntity.type === 'hospitals') {
+                          if (item.hospital?._id !== selectedInvEntity.id) return false;
+                          // Exclude the org's own OUT record that just references this hospital
+                          if (item.inventoryType === 'out') return ['hospital', 'patient', 'manual', null, undefined].includes(item.source_type);
+                          return true;
+                        }
+                        if (selectedInvEntity.type === 'organisations') {
+                          if (item.organisation?._id !== selectedInvEntity.id) return false;
+                          // Exclude the hospital's own IN record that just references this org
+                          if (item.inventoryType === 'in') return item.target_type !== 'hospital';
+                          return true;
+                        }
+                        return item.donor?._id === selectedInvEntity.id;
+                      });
+
+                      if (entityTxSearch.trim()) {
+                        const q = entityTxSearch.toLowerCase();
+                        txs = txs.filter(item =>
+                          item.bloodGroup?.toLowerCase().includes(q) ||
+                          item.transactionId?.toLowerCase().includes(q) ||
+                          item.status?.toLowerCase().includes(q)
+                        );
+                      }
+
+                      if (txs.length === 0) {
+                        return <p className="text-center text-gray-500 py-10">No transactions found</p>;
+                      }
+
+                      return (
+                        <div className="overflow-x-auto">
+                          <table className="w-full">
+                            <thead className="bg-gray-100">
+                              <tr>
+                                <th className="p-3 text-left text-sm">TX ID</th>
+                                <th className="p-3 text-left text-sm">Type</th>
+                                <th className="p-3 text-left text-sm">Blood</th>
+                                <th className="p-3 text-left text-sm">Qty</th>
+                                <th className="p-3 text-left text-sm">
+                                  {selectedInvEntity.type === 'donors' ? 'Donated To' : 'Counterparty'}
+                                </th>
+                                <th className="p-3 text-left text-sm">Expiry</th>
+                                <th className="p-3 text-left text-sm">Date</th>
+                                <th className="p-3 text-left text-sm">Status</th>
+                                <th className="p-3 text-left text-sm">Actions</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {txs.map((item, idx) => {
+                                const isExpired = item.status === 'expired' || new Date(item.expiryDate) < new Date();
+                                const isExpiringSoon = !isExpired && new Date(item.expiryDate) < new Date(Date.now() + 5 * 24 * 60 * 60 * 1000);
+
+                                // "Own record, other side" — donors see where blood went;
+                                // hospitals/organisations see who/what the transaction was with.
+                                let counterparty = 'N/A';
+                                if (selectedInvEntity.type === 'donors') {
+                                  counterparty = item.hospital?.hospitalName || item.organisation?.organisationName || item.target_name || 'N/A';
+                                } else if (selectedInvEntity.type === 'hospitals') {
+                                  counterparty = item.donor?.name || item.organisation?.organisationName || item.source_name || item.patientName || 'N/A';
+                                } else {
+                                  counterparty = item.donor?.name || item.hospital?.hospitalName || item.source_name || item.target_name || 'N/A';
+                                }
+
+                                return (
+                                  <tr key={item._id} className={`${idx % 2 === 0 ? 'bg-gray-50' : ''} ${isExpired ? 'opacity-60' : ''}`}>
+                                    <td className="p-3 text-xs font-mono text-gray-600">{item.transactionId?.slice(-8)}</td>
+                                    <td className="p-3">
+                                      <span className={`px-2 py-1 rounded text-xs font-semibold ${item.inventoryType === 'in' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                        {item.inventoryType === 'in' ? 'IN' : 'OUT'}
+                                      </span>
+                                    </td>
+                                    <td className="p-3 font-bold text-red-600">{item.bloodGroup}</td>
+                                    <td className="p-3">{item.quantity}</td>
+                                    <td className="p-3 text-sm">{counterparty}</td>
+                                    <td className="p-3">
+                                      <span className={isExpired ? 'text-red-600 font-bold text-xs' : isExpiringSoon ? 'text-orange-600 font-semibold text-xs' : 'text-gray-600 text-xs'}>
+                                        {new Date(item.expiryDate).toLocaleDateString()}
+                                      </span>
+                                    </td>
+                                    <td className="p-3 text-xs text-gray-600">
+                                      {new Date(item.createdAt).toLocaleDateString()}
+                                    </td>
+                                    <td className="p-3">
+                                      <span className={`px-2 py-1 rounded text-xs font-semibold ${item.status === 'expired' ? 'bg-red-100 text-red-700' :
+                                        item.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
+                                          item.status === 'approved' ? 'bg-blue-100 text-blue-700' :
+                                            item.status === 'rejected' ? 'bg-gray-100 text-gray-700' :
+                                              'bg-green-100 text-green-700'
+                                        }`}>
+                                        {item.status || 'completed'}
+                                      </span>
+                                    </td>
+                                    <td className="p-3">
+                                      <div className="flex gap-2">
+                                        <button
+                                          onClick={() => handleEdit(item)}
+                                          className="text-blue-600 hover:text-blue-800"
+                                          title="Edit"
+                                        >
+                                          <i className="fa fa-edit w-4 h-4"></i>
+                                        </button>
+                                        <button
+                                          onClick={() => handleDelete(item._id, 'inventory')}
+                                          className="text-red-600 hover:text-red-800"
+                                          title="Delete"
+                                        >
+                                          <Trash2 className="w-4 h-4" />
+                                        </button>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      );
+                    })()}
+                  </>
+                )}
               </div>
             )}
 
@@ -986,6 +1091,16 @@ const AdminDashboard = () => {
                 <h2 className="text-2xl font-bold text-gray-800 mb-4">
                   All Hospitals ({hospitals.length})
                 </h2>
+                <div className="relative mb-4 max-w-sm">
+                  <i className="fa fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
+                  <input
+                    type="text"
+                    value={hospitalsSearch}
+                    onChange={e => setHospitalsSearch(e.target.value)}
+                    placeholder="Search by name, email or phone..."
+                    className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-red-500"
+                  />
+                </div>
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead className="bg-gray-100">
@@ -1000,7 +1115,13 @@ const AdminDashboard = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {hospitals.map((hospital, idx) => (
+                      {hospitals.filter(h => {
+                        const q = hospitalsSearch.toLowerCase();
+                        if (!q) return true;
+                        return (h.hospitalName || '').toLowerCase().includes(q) ||
+                          (h.email || '').toLowerCase().includes(q) ||
+                          (h.phone || '').toLowerCase().includes(q);
+                      }).map((hospital, idx) => (
                         <tr key={hospital._id} className={idx % 2 === 0 ? 'bg-gray-50' : ''}>
                           <td className="p-3 font-semibold">{hospital.hospitalName}</td>
                           {showIDs && (
@@ -1072,6 +1193,16 @@ const AdminDashboard = () => {
                 <h2 className="text-2xl font-bold text-gray-800 mb-4">
                   All Organizations ({organisations.length})
                 </h2>
+                <div className="relative mb-4 max-w-sm">
+                  <i className="fa fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
+                  <input
+                    type="text"
+                    value={organisationsSearch}
+                    onChange={e => setOrganisationsSearch(e.target.value)}
+                    placeholder="Search by name, email or phone..."
+                    className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-red-500"
+                  />
+                </div>
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead className="bg-gray-100">
@@ -1086,7 +1217,13 @@ const AdminDashboard = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {organisations.map((org, idx) => (
+                      {organisations.filter(o => {
+                        const q = organisationsSearch.toLowerCase();
+                        if (!q) return true;
+                        return (o.organisationName || '').toLowerCase().includes(q) ||
+                          (o.email || '').toLowerCase().includes(q) ||
+                          (o.phone || '').toLowerCase().includes(q);
+                      }).map((org, idx) => (
                         <tr key={org._id} className={idx % 2 === 0 ? 'bg-gray-50' : ''}>
                           <td className="p-3 font-semibold">{org.organisationName}</td>
                           {showIDs && (
@@ -1158,6 +1295,16 @@ const AdminDashboard = () => {
                 <h2 className="text-2xl font-bold text-gray-800 mb-4">
                   All Donors ({donors.length})
                 </h2>
+                <div className="relative mb-4 max-w-sm">
+                  <i className="fa fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
+                  <input
+                    type="text"
+                    value={donorsSearch}
+                    onChange={e => setDonorsSearch(e.target.value)}
+                    placeholder="Search by name, email or phone..."
+                    className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-red-500"
+                  />
+                </div>
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead className="bg-gray-100">
@@ -1173,7 +1320,13 @@ const AdminDashboard = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {donors.map((donor, idx) => (
+                      {donors.filter(d => {
+                        const q = donorsSearch.toLowerCase();
+                        if (!q) return true;
+                        return (d.name || '').toLowerCase().includes(q) ||
+                          (d.email || '').toLowerCase().includes(q) ||
+                          (d.phone || '').toLowerCase().includes(q);
+                      }).map((donor, idx) => (
                         <tr key={donor._id} className={idx % 2 === 0 ? 'bg-gray-50' : ''}>
                           <td className="p-3">{donor.name}</td>
                           <td className="p-3 text-sm">{donor.email}</td>
@@ -1473,9 +1626,79 @@ const AdminDashboard = () => {
             </div>
           </div>
         )}
+        {/* Low Stock — Blood Group Drill-down Modal */}
+        {selectedLowStockGroup && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl w-full max-w-2xl max-h-[85vh] flex flex-col">
+              <div className="bg-red-600 text-white px-6 py-4 rounded-t-xl flex items-center justify-between">
+                <h2 className="font-bold text-lg">{selectedLowStockGroup} — Low Stock Facilities</h2>
+                <button onClick={() => setSelectedLowStockGroup(null)} className="hover:opacity-70">
+                  <i className="fa fa-times text-xl"></i>
+                </button>
+              </div>
+              <div className="overflow-y-auto p-6">
+                {(() => {
+                  const groupAlerts = lowStockAlerts.filter(a => a.bloodGroup === selectedLowStockGroup);
+                  const hospitalAlerts = groupAlerts.filter(a => a.type === 'hospital');
+                  const orgAlerts = groupAlerts.filter(a => a.type === 'organisation');
+
+                  const renderAlert = (alert, idx) => (
+                    <div key={idx} className={`flex items-center justify-between rounded-lg p-4 border-l-4 shadow-sm ${alert.severity === 'critical' ? 'bg-red-50 border-red-500' :
+                      alert.severity === 'high' ? 'bg-orange-50 border-orange-500' :
+                        'bg-yellow-50 border-yellow-500'
+                      }`}>
+                      <div className="flex items-center gap-3">
+                        <i className={`fa ${alert.type === 'hospital' ? 'fa-hospital' : 'fa-building'} text-xl ${alert.severity === 'critical' ? 'text-red-600' :
+                          alert.severity === 'high' ? 'text-orange-600' :
+                            'text-yellow-600'
+                          }`}></i>
+                        <div>
+                          <p className="font-semibold text-gray-800">{alert.name}</p>
+                          {showIDs && <p className="text-xs text-gray-500">ID: {alert.systemId}</p>}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <span className={`text-xs font-bold px-2 py-1 rounded ${alert.severity === 'critical' ? 'bg-red-600 text-white' : alert.severity === 'high' ? 'bg-orange-600 text-white' : 'bg-yellow-600 text-white'}`}>
+                          {alert.severity.toUpperCase()}
+                        </span>
+                        <p className="text-lg font-bold text-gray-800 mt-1">{alert.currentStock} units</p>
+                        <p className="text-xs text-gray-500">Threshold: {alert.threshold}</p>
+                      </div>
+                    </div>
+                  );
+
+                  return (
+                    <div className="space-y-6">
+                      <div>
+                        <h3 className="font-bold text-gray-700 mb-2 flex items-center gap-2">
+                          <i className="fa fa-hospital text-blue-600"></i> Hospitals ({hospitalAlerts.length})
+                        </h3>
+                        {hospitalAlerts.length === 0 ? (
+                          <p className="text-sm text-gray-400">No hospitals low on {selectedLowStockGroup}</p>
+                        ) : (
+                          <div className="space-y-2">{hospitalAlerts.map(renderAlert)}</div>
+                        )}
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-gray-700 mb-2 flex items-center gap-2">
+                          <i className="fa fa-building text-purple-600"></i> Organisations ({orgAlerts.length})
+                        </h3>
+                        {orgAlerts.length === 0 ? (
+                          <p className="text-sm text-gray-400">No organisations low on {selectedLowStockGroup}</p>
+                        ) : (
+                          <div className="space-y-2">{orgAlerts.map(renderAlert)}</div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
 };
 
-export default AdminDashboard;  
+export default AdminDashboard;
