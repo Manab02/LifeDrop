@@ -8,9 +8,8 @@ import Register from './pages/Register';
 import EmailVerify from './pages/EmailVerify';
 import ResetPassword from './pages/ResetPassword';
 import NotFound from './pages/NotFound';
-import CompleteProfile from './pages/CompleteProfile';
+import CompleteProfile from './pages/Completeprofile';
 import ProtectedRoute from './components/ProtectedRoute';
-
 import AdminDashboard from './pages/AdminDashboard';
 import DonorDashboard from './pages/DonorDashboard';
 import HospitalDashboard from './pages/HospitalDashboard';
