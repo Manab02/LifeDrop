@@ -11,7 +11,6 @@ const Navbar = () => {
     return (
         <header className="shadow-md bg-white sticky top-0 z-50">
             <div className="flex justify-between items-center px-6 py-4">
-                {/* Logo */}
                 <Link
                     to="/"
                     className="flex items-center space-x-3 hover:opacity-90 transition"
@@ -24,7 +23,6 @@ const Navbar = () => {
                     </div>
                 </Link>
 
-                {/* For (mobile) View */}
                 <button
                     onClick={toggleMenu}
                     className="md:hidden text-red-600 text-3xl focus:outline-none"
@@ -32,7 +30,6 @@ const Navbar = () => {
                     {menuOpen ? "✕" : "☰"}
                 </button>
 
-                {/* Desktop Menu */}
                 <nav className="hidden md:flex space-x-8 font-medium">
                     <Link
                         to="/find-donor"
@@ -78,7 +75,6 @@ const Navbar = () => {
                 </nav>
             </div>
 
-            {/* Mobile Menu */}
             {menuOpen && (
                 <div className="font-medium px-6 pb-4 md:hidden mt-2 space-y-3 bg-white border-t border-gray-100">
                     <Link

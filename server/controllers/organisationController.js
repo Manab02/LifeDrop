@@ -71,7 +71,6 @@ export const getOrganisationBloodStock = async (req, res) => {
     }
 };
 
-// ── CAMP ROUTES ────────────────────────────────────────────
 
 export const getCamps = async (req, res) => {
     try {
@@ -134,7 +133,6 @@ export const deleteCamp = async (req, res) => {
     }
 };
 
-// Returns camps whose date is tomorrow (for notification badge)
 export const getCampNotifications = async (req, res) => {
     try {
         const tomorrow = new Date();
@@ -152,10 +150,8 @@ export const getCampNotifications = async (req, res) => {
     }
 };
 
-// Donor list for this org
 export const getOrgDonors = async (req, res) => {
     try {
-        // Registered donors
         const registeredRecords = await inventoryModels.find({
             organisation: req.body.userId,
             inventoryType: 'in',
@@ -164,7 +160,6 @@ export const getOrgDonors = async (req, res) => {
             .populate('hospital', 'hospitalName')
             .populate('organisation', 'organisationName');
 
-        // Walk-in (unregistered) donors — source_name set, donor null
         const walkinRecords = await inventoryModels.find({
             organisation: req.body.userId,
             inventoryType: 'in',

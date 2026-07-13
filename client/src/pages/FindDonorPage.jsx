@@ -80,7 +80,6 @@ const FindDonor = () => {
         }
     }, [selectedState, districtsData]);
 
-    // Update cities when district changes
     useEffect(() => {
         if (selectedDistrict && selectedState) {
             const state = citiesData.find(s => s.name === selectedState);
@@ -138,7 +137,7 @@ const FindDonor = () => {
 
     return (
         <div className="min-h-screen bg-gray-50">
-            {/* Hero Section */}
+        
             <section className="text-center py-24 px-4 bg-gradient-to-r from-red-700 via-red-500 to-red-300 relative overflow-hidden">
                 <div className="relative z-10 flex flex-col items-center justify-center space-y-6">
                     <div className="flex flex-col md:flex-row items-center justify-center space-y-6 md:space-y-0 md:space-x-6">
@@ -152,7 +151,7 @@ const FindDonor = () => {
                         />
                     </div>
 
-                    {/* Search Box */}
+                
                     <div className="bg-white shadow-lg rounded-2xl p-6 flex flex-col md:flex-row md:flex-wrap md:justify-center md:space-x-4 space-y-4 md:space-y-0 w-full max-w-5xl">
                         <div className="flex flex-col">
                             <label className="font-semibold mb-1 text-sm">Blood Group</label>
@@ -233,8 +232,7 @@ const FindDonor = () => {
                     </div>
                 </div>
             </section>
-
-            {/* Results Section */}
+            
             <section className="max-w-7xl mx-auto px-4 py-12">
                 {searched && (
                     <>

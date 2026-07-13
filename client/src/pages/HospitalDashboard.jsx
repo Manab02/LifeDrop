@@ -28,8 +28,6 @@ const HospitalDashboard = () => {
     const [rejectTransferId, setRejectTransferId] = useState(null);
     const [rejectReason, setRejectReason] = useState('');
     const [searchRecords, setSearchRecords] = useState('');
-
-    // ── Profile section state ────────────────────────────────────
     const [profileForm, setProfileForm] = useState({ hospitalName: '', phone: '', state: '', district: '', city: '' });
     const [profileStates, setProfileStates] = useState([]);
     const [profileDistricts, setProfileDistricts] = useState([]);
@@ -56,8 +54,8 @@ const HospitalDashboard = () => {
     const [showWalkinModal, setShowWalkinModal] = useState(false);
     const [walkinForm, setWalkinForm] = useState({ donorName: '', donorPhone: '', campName: '', bloodGroup: '', quantity: '', expiryDate: '' });
     const [walkinSaving, setWalkinSaving] = useState(false);
-    const [recordsSubTab, setRecordsSubTab] = useState('in'); // 'in' | 'out'
-    const [transfersSubTab, setTransfersSubTab] = useState('pending'); // 'pending' | 'history'
+    const [recordsSubTab, setRecordsSubTab] = useState('in'); 
+    const [transfersSubTab, setTransfersSubTab] = useState('pending'); 
 
     const [requestFormData, setRequestFormData] = useState({
         bloodGroup: '',
@@ -190,9 +188,6 @@ const HospitalDashboard = () => {
             if (stock[group].total < 0) {
                 stock[group].total = 0;
             }
-            // Can't have more units "expiring soon" than are actually still in stock —
-            // if the batch that was expiring has since been used up (OUT), it's gone,
-            // not "about to expire".
             if (stock[group].expiring > stock[group].total) {
                 stock[group].expiring = stock[group].total;
             }
@@ -223,9 +218,6 @@ const HospitalDashboard = () => {
         });
 
         totalUnits = Math.max(0, totalUnits);
-
-        // Compute net stock per blood group locally (don't rely on the
-        // `bloodStock` state var here — it may not have re-rendered yet).
         const netByGroup = {};
         const expiringByGroup = {};
         inventoryData.forEach(item => {
@@ -240,8 +232,6 @@ const HospitalDashboard = () => {
             }
         });
 
-        // A group can't have more units "expiring soon" than it actually has in stock —
-        // once used (OUT), that blood is gone, not "about to expire".
         let expiringCount = 0;
         Object.keys(expiringByGroup).forEach(group => {
             const net = Math.max(0, netByGroup[group] || 0);
@@ -304,9 +294,6 @@ const HospitalDashboard = () => {
             }
         });
 
-        // Check expiring blood — but only if that blood group actually still
-        // has net stock; a batch that's already been fully used (OUT) isn't
-        // "about to expire", it's gone.
         const netStockByGroup = {};
         inventoryData.forEach(item => {
             if (item.status === 'expired' || new Date(item.expiryDate) < now) return;
@@ -328,7 +315,6 @@ const HospitalDashboard = () => {
             }
         });
 
-        // Check low stock
         Object.entries(bloodStock).forEach(([group, data]) => {
             if (data.total === 0) {
                 notifs.push({
@@ -494,7 +480,6 @@ const HospitalDashboard = () => {
                     return;
                 }
             }
-            // If this record was added from a "blood sent to you" notification, clear it from Pending
             if (manualAddSourceTransferId) {
                 await transferAPI.acknowledge(manualAddSourceTransferId);
             }
@@ -512,8 +497,6 @@ const HospitalDashboard = () => {
             setManualAddSaving(false);
         }
     };
-
-    // ── Profile: fetch, cascading location lists, update, change password ──
     const fetchHospitalProfile = async () => {
         const data = await hospitalAPI.getProfile();
         if (data.success && data.hospital) {
@@ -679,10 +662,8 @@ const HospitalDashboard = () => {
 
     return (
         <div className="flex h-screen bg-gray-100 overflow-hidden">
-            {/* Mobile overlay */}
             {sidebarOpen && <div className="fixed inset-0 bg-black/50 z-30 lg:hidden" onClick={() => setSidebarOpen(false)} />}
 
-            {/* Sidebar */}
             <aside className={`fixed lg:relative z-40 h-full w-64 bg-red-700 text-white flex flex-col flex-shrink-0 transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0`}>
                 <div className="p-5 text-center border-b border-red-500">
                     <h2 className="text-2xl font-bold">🏥 Hospital Panel</h2>
@@ -751,7 +732,6 @@ const HospitalDashboard = () => {
                 </div>
             </aside>
 
-            {/* Mobile header */}
             <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
                 <header className="lg:hidden bg-red-700 text-white flex items-center justify-between px-4 py-3 flex-shrink-0">
                     <button onClick={() => setSidebarOpen(true)} className="text-xl"><i className="fa fa-bars"></i></button>
@@ -759,7 +739,6 @@ const HospitalDashboard = () => {
                     <span className="w-6"></span>
                 </header>
 
-                {/* Main Content */}
                 <main className="flex-1 p-6 overflow-y-auto">
                     <div className="flex items-center justify-between mb-6">
                         <h1 className="text-2xl font-semibold text-gray-800">
@@ -767,10 +746,8 @@ const HospitalDashboard = () => {
                         </h1>
                     </div>
 
-                    {/* DASHBOARD TAB */}
                     {activeTab === 'dashboard' && (
                         <>
-                            {/* Stats Cards */}
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
                                 <div className="bg-gradient-to-br from-blue-500 to-blue-600 text-white p-6 rounded-xl shadow-lg">
                                     <div className="flex items-center justify-between">
@@ -813,7 +790,6 @@ const HospitalDashboard = () => {
                                 </div>
                             </div>
 
-                            {/* Quick Actions */}
                             <div className="mb-6">
                                 <h2 className="text-lg font-semibold mb-3 text-gray-700">Quick Actions</h2>
                                 <div className="flex flex-wrap gap-4">
@@ -848,7 +824,6 @@ const HospitalDashboard = () => {
                                 </div>
                             </div>
 
-                            {/* Blood Stock Overview — easy to see, click a group to jump to full Blood Stock tab */}
                             <div className="mb-6">
                                 <h2 className="text-lg font-semibold mb-3 text-gray-700">Blood Stock Overview</h2>
                                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -874,7 +849,6 @@ const HospitalDashboard = () => {
                                 </div>
                             </div>
 
-                            {/* Alert Cards */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                                 {stats.expiringItemsCount > 0 && (
                                     <div className="bg-orange-50 border-l-4 border-orange-500 p-4 rounded-lg shadow">
@@ -906,7 +880,6 @@ const HospitalDashboard = () => {
                                 )}
                             </div>
 
-                            {/* Recent Records Preview */}
                             <div className="mb-6">
                                 <div className="flex items-center justify-between mb-3">
                                     <h2 className="text-lg font-semibold text-gray-700">Recent Records</h2>
@@ -951,7 +924,6 @@ const HospitalDashboard = () => {
                                 </div>
                             </div>
 
-                            {/* Recent Notifications Preview */}
                             <div>
                                 <div className="flex items-center justify-between mb-3">
                                     <h2 className="text-lg font-semibold text-gray-700">Recent Notifications</h2>
@@ -980,7 +952,6 @@ const HospitalDashboard = () => {
                         </>
                     )}
 
-                    {/* BLOOD REQUESTS TAB */}
                     {activeTab === 'requests' && (
                         <div>
                             <div className="flex items-center justify-between mb-4">
@@ -1018,9 +989,6 @@ const HospitalDashboard = () => {
                                     </thead>
                                     <tbody>
                                         {(() => {
-                                            // Only genuine blood requests this hospital sent to an
-                                            // organisation belong here — NOT blood usage/dispensing
-                                            // records (those live in Blood Stock / All Records instead).
                                             const transferRows = transfers
                                                 .filter(t => t.initiatedBy !== 'organisation')
                                                 .map(t => ({
@@ -1111,8 +1079,6 @@ const HospitalDashboard = () => {
                             </div>
                         </div>
                     )}
-
-                    {/* BLOOD STOCK TAB */}
                     {activeTab === 'stock' && (
                         <div>
                             <div className="flex items-center justify-between mb-4">
@@ -1145,7 +1111,6 @@ const HospitalDashboard = () => {
                                 })}
                             </div>
 
-                            {/* Per-group breakdown modal */}
                             {selectedStockGroup && (() => {
                                 const data = bloodStock[selectedStockGroup] || { total: 0, expiring: 0, items: [] };
                                 const status = getStockStatus(data.total);
@@ -1210,10 +1175,9 @@ const HospitalDashboard = () => {
                         </div>
                     )}
 
-                    {/* ALL RECORDS TAB — clickable IN / OUT toggle */}
                     {activeTab === 'records' && (
                         <div>
-                            {/* Toggle */}
+                        
                             <div className="flex gap-2 mb-5 border-b border-gray-200">
                                 {[
                                     { type: 'in', label: 'Blood IN', icon: 'fa-arrow-down', color: 'green' },
@@ -1312,12 +1276,10 @@ const HospitalDashboard = () => {
                         </div>
                     )}
 
-                    {/* TRANSFERS TAB */}
                     {activeTab === 'transfers' && (
                         <div>
                             <h2 className="text-xl font-bold mb-4 text-gray-800">Blood Transfers & Requests</h2>
 
-                            {/* Pending / History toggle */}
                             <div className="flex gap-2 mb-4 border-b border-gray-200">
                                 {[
                                     { key: 'pending', label: 'Pending', count: transfers.filter(isTransferPending).length },
@@ -1333,7 +1295,6 @@ const HospitalDashboard = () => {
                                 ))}
                             </div>
 
-                            {/* Status legend */}
                             <div className="flex flex-wrap gap-2 mb-4 text-xs">
                                 {[
                                     { s: 'requested', c: 'bg-yellow-100 text-yellow-700', l: 'Sent to Org' },
@@ -1391,7 +1352,7 @@ const HospitalDashboard = () => {
                                                     )}
                                                     <p className="text-xs text-gray-400 mt-1">{new Date(t.createdAt).toLocaleString()}</p>
                                                 </div>
-                                                {/* Hospital action — only for a request the hospital itself sent */}
+                    
                                                 {awaitingYourConfirm && (
                                                     <div className="flex flex-col gap-2 flex-shrink-0">
                                                         <button onClick={() => handleApproveTransfer(t._id)}
@@ -1430,7 +1391,6 @@ const HospitalDashboard = () => {
                         </div>
                     )}
 
-                    {/* NOTIFICATIONS TAB */}
                     {activeTab === 'notifications' && (
                         <div>
                             <h2 className="text-xl font-bold mb-4 text-gray-800">Notifications ({notifications.length})</h2>
@@ -1592,8 +1552,6 @@ const HospitalDashboard = () => {
                             </div>
                         </div>
                     )}
-
-                    {/* Request Blood Modal */}
                     {showRequestModal && (
                         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                             <div className="bg-white rounded-xl max-w-md w-full">
@@ -1625,7 +1583,6 @@ const HospitalDashboard = () => {
                                         <p className="text-xs text-gray-500 mt-1">The organisation will check stock and approve or reject your request</p>
                                     </div>
 
-                                    {/* Multi blood group rows */}
                                     <div>
                                         <div className="flex items-center justify-between mb-2">
                                             <label className="block text-gray-700 font-semibold">Blood Group(s) *</label>
@@ -1691,7 +1648,6 @@ const HospitalDashboard = () => {
                         </div>
                     )}
 
-                    {/* Decrease Modal */}
                     {showDecreaseModal && (
                         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                             <div className="bg-white rounded-xl max-w-md w-full">
@@ -1769,7 +1725,6 @@ const HospitalDashboard = () => {
                     )}
 
 
-                    {/* Add Manual Record Modal — hospital credits their own stock */}
                     {showManualAddModal && (
                         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                             <div className="bg-white rounded-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
@@ -1872,7 +1827,6 @@ const HospitalDashboard = () => {
                         inventoryRecord={selectedInventory}
                     />
 
-                    {/* Walk-in Donation Modal — hospital credits their own stock from an unregistered donor */}
                     {showWalkinModal && (
                         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
                             <div className="bg-white rounded-xl w-full max-w-md">
@@ -1979,7 +1933,6 @@ const HospitalDashboard = () => {
                 </main>
             </div>
 
-            {/* Reject Transfer Modal */}
             {rejectTransferId && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-xl w-full max-w-sm p-6">

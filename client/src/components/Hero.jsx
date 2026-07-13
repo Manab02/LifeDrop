@@ -11,15 +11,12 @@ const Hero = () => {
     const [searchType, setSearchType] = useState("donor"); 
     const [cities, setCities] = useState([]);
 
-    // Load states
     useEffect(() => {
         fetch("/states.json")
             .then((res) => res.json())
             .then((data) => setStates(data))
             .catch((err) => console.error("Error fetching states:", err));
     }, []);
-
-    // Load districts when state changes
     useEffect(() => {
         if (!selectedState) {
             setDistricts([]);
@@ -38,7 +35,6 @@ const Hero = () => {
             .catch((err) => console.error("Error fetching districts:", err));
     }, [selectedState]);
 
-    // Load cities when district changes
     useEffect(() => {
         if (!selectedDistrict) {
             setCities([]);
@@ -55,11 +51,9 @@ const Hero = () => {
             .catch((err) => console.error("Error fetching cities:", err));
     }, [selectedDistrict, selectedState]);
 
-    // Handle search with proper redirect
     const handleSearch = (e) => {
         e.preventDefault();
 
-        // Validation
         if (!searchType) {
             alert('Please select what you want to search for');
             return;
@@ -103,10 +97,8 @@ const Hero = () => {
                     />
                 </div>
 
-                {/* Search Box */}
                 <form onSubmit={handleSearch} className="bg-white shadow-lg rounded-2xl p-6 flex flex-col md:flex-row md:flex-wrap md:justify-center md:space-x-4 space-y-4 md:space-y-0 w-full max-w-6xl">
 
-                    {/*  Search Type Selector */}
                     <div className="flex flex-col">
                         <label className="font-semibold mb-1 text-sm text-gray-700">Search For</label>
                         <select
@@ -121,7 +113,6 @@ const Hero = () => {
                         </select>
                     </div>
 
-                    {/* Blood Group - Show for all types */}
                     <div className="flex flex-col">
                         <label className="font-semibold mb-1 text-sm text-gray-700">
                             Blood Group {searchType === 'donor' && <span className="text-red-500">*</span>}
@@ -139,7 +130,6 @@ const Hero = () => {
                         </select>
                     </div>
 
-                    {/* State */}
                     <div className="flex flex-col">
                         <label className="font-semibold mb-1 text-sm text-gray-700">State *</label>
                         <select
@@ -157,7 +147,6 @@ const Hero = () => {
                         </select>
                     </div>
 
-                    {/* District */}
                     <div className="flex flex-col">
                         <label className="font-semibold mb-1 text-sm text-gray-700">District *</label>
                         <select
@@ -176,7 +165,6 @@ const Hero = () => {
                         </select>
                     </div>
 
-                    {/* City */}
                     <div className="flex flex-col">
                         <label className="font-semibold mb-1 text-sm text-gray-700">City *</label>
                         <select
@@ -193,7 +181,6 @@ const Hero = () => {
                         </select>
                     </div>
 
-                    {/* Search Button */}
                     <div className="flex items-end justify-center md:justify-start">
                         <button
                             type="submit"
@@ -207,7 +194,6 @@ const Hero = () => {
                     </div>
                 </form>
 
-                {/* Info text */}
                 <p className="text-white text-sm md:text-base max-w-2xl">
                     {searchType === 'donor' && '🩸 Find blood donors near you'}
                     {searchType === 'hospital' && '🏥 Find hospitals with blood stock availability'}

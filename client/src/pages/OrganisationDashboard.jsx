@@ -16,8 +16,6 @@ export default function OrganisationDashboard() {
     const [activeTab, setActiveTab] = useState(() => sessionStorage.getItem('organisation_active_tab') || 'dashboard');
     useEffect(() => { sessionStorage.setItem('organisation_active_tab', activeTab); }, [activeTab]);
     const [sidebarOpen, setSidebarOpen] = useState(false);
-
-    // Data
     const [inventory, setInventory] = useState([]);
     const [bloodStock, setBloodStock] = useState({});
     const [bloodStockDetails, setBloodStockDetails] = useState({});
@@ -28,21 +26,15 @@ export default function OrganisationDashboard() {
     const [notifications, setNotifications] = useState([]);
     const [expiryWarnings, setExpiryWarnings] = useState([]);
     const [stats, setStats] = useState({ totalCamps: 0, totalDonors: 0, bloodUnits: 0, partnerHospitals: 0 });
-
-    // Modals
     const [showRecordModal, setShowRecordModal] = useState(false);
     const [showManualAddModal, setShowManualAddModal] = useState(false);
     const [showEditModal, setShowEditModal] = useState(false);
     const [showCampModal, setShowCampModal] = useState(false);
     const [editingCamp, setEditingCamp] = useState(null);
     const [selectedInventory, setSelectedInventory] = useState(null);
-
-    // Search
     const [searchDonors, setSearchDonors] = useState('');
     const [searchRecords, setSearchRecords] = useState('');
     const [searchHospital, setSearchHospital] = useState('');
-
-    // Transfer
     const [showTransferModal, setShowTransferModal] = useState(false);
     const [showWalkinModal, setShowWalkinModal] = useState(false);
     const [walkinForm, setWalkinForm] = useState({ donorName: '', donorPhone: '', campName: '', bloodGroup: '', quantity: '', expiryDate: '' });
@@ -52,12 +44,8 @@ export default function OrganisationDashboard() {
     const [transferForm, setTransferForm] = useState({ hospitalId: '', notes: '', items: [{ bloodGroup: '', quantity: '', expiryDate: '' }] });
     const [transferSaving, setTransferSaving] = useState(false);
     const [viewTransfer, setViewTransfer] = useState(null);
-
-    // Camp form
     const [campForm, setCampForm] = useState({ title: '', location: '', date: '', description: '' });
     const [campSaving, setCampSaving] = useState(false);
-
-    // ── Profile section state ────────────────────────────────────
     const [profileForm, setProfileForm] = useState({ organisationName: '', phone: '', state: '', district: '', city: '' });
     const [profileStates, setProfileStates] = useState([]);
     const [profileDistricts, setProfileDistricts] = useState([]);
@@ -67,9 +55,8 @@ export default function OrganisationDashboard() {
     const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '', confirmNewPassword: '' });
     const [passwordSaving, setPasswordSaving] = useState(false);
     const [passwordMessage, setPasswordMessage] = useState('');
-    const [orgTransfersSubTab, setOrgTransfersSubTab] = useState('pending'); // 'pending' | 'history'
+    const [orgTransfersSubTab, setOrgTransfersSubTab] = useState('pending'); 
 
-    // ── Auth ──────────────────────────────────────────────────────
     useEffect(() => {
         const userData = JSON.parse(localStorage.getItem('user') || '{}');
         if (!userData.id || userData.role !== 'organisation') {
@@ -81,7 +68,6 @@ export default function OrganisationDashboard() {
         setLoading(false);
     }, []);
 
-    // ── Fetch everything ──────────────────────────────────────────
     const fetchAll = useCallback(async () => {
         await Promise.all([fetchInventory(), fetchCamps(), fetchDonors(), fetchTransfers(), fetchHospitals(), fetchOrgProfile()]);
     }, []);
@@ -129,9 +115,9 @@ export default function OrganisationDashboard() {
         if (data.success) setTransfers(data.transfers || []);
     };
 
-    const [orgActionTransfer, setOrgActionTransfer] = useState(null); // transfer being approved/rejected
-    const [orgStockCheck, setOrgStockCheck] = useState(null);         // stock check result
-    const [orgExpiryItems, setOrgExpiryItems] = useState([]);          // expiry dates set by org
+    const [orgActionTransfer, setOrgActionTransfer] = useState(null); 
+    const [orgStockCheck, setOrgStockCheck] = useState(null);        
+    const [orgExpiryItems, setOrgExpiryItems] = useState([]);         
     const [orgRejectId, setOrgRejectId] = useState(null);
     const [orgRejectReason, setOrgRejectReason] = useState('');
 
@@ -172,7 +158,6 @@ export default function OrganisationDashboard() {
         } catch (_) { }
     };
 
-    // ── Calculations ──────────────────────────────────────────────
     const calcBloodStock = (inv) => {
         const stock = Object.fromEntries(BLOOD_GROUPS.map(g => [g, 0]));
         inv.forEach(item => {
@@ -181,15 +166,10 @@ export default function OrganisationDashboard() {
                 else if (item.inventoryType === 'out') stock[item.bloodGroup] = (stock[item.bloodGroup] || 0) - item.quantity;
             }
         });
-        // clamp negatives
         Object.keys(stock).forEach(g => { if (stock[g] < 0) stock[g] = 0; });
         setBloodStock(stock);
     };
 
-    // Detailed per-group breakdown (total/expiring/items), same shape as the
-    // Hospital dashboard, so clicking a blood group shows exactly what's in
-    // stock and what's expiring soon — with expiring capped to real net
-    // stock so a fully-used batch doesn't keep showing as "expiring".
     const calcBloodStockDetails = (inv) => {
         const details = {};
         BLOOD_GROUPS.forEach(g => { details[g] = { total: 0, expiring: 0, items: [] }; });
@@ -224,7 +204,6 @@ export default function OrganisationDashboard() {
 
         Object.keys(details).forEach(group => {
             if (details[group].total < 0) details[group].total = 0;
-            // Can't have more units "expiring soon" than are actually still in stock
             if (details[group].expiring > details[group].total) details[group].expiring = details[group].total;
         });
 
@@ -238,7 +217,6 @@ export default function OrganisationDashboard() {
             if (item.donor) donors.add(item.donor._id);
             if (item.hospital) hospitals.add(item.hospital._id);
         });
-        // net available = sum of all (in - out) per group, clamped to 0
         const net = Object.fromEntries(BLOOD_GROUPS.map(g => [g, 0]));
         inv.forEach(item => {
             if (item.status !== 'expired' && new Date(item.expiryDate) > new Date()) {
@@ -258,7 +236,6 @@ export default function OrganisationDashboard() {
     const buildNotifications = (inv) => {
         const notifs = [];
         const now = new Date();
-        // low/empty stock
         const stock = {};
         BLOOD_GROUPS.forEach(g => stock[g] = 0);
         inv.forEach(item => {
@@ -277,8 +254,6 @@ export default function OrganisationDashboard() {
                 notifs.push({ id: `low-${g}`, type: 'warning', icon: 'info-circle', message: `${g} is low: ${qty} units remaining`, time: 'Now' });
             }
         });
-        // expiring soon — only if this blood group still has net stock; a
-        // batch that's already been fully used (OUT) isn't "expiring", it's gone.
         inv.forEach(item => {
             const expiry = new Date(item.expiryDate);
             const days = Math.ceil((expiry - now) / 86400000);
@@ -289,7 +264,6 @@ export default function OrganisationDashboard() {
         setNotifications(notifs.slice(0, 20));
     };
 
-    // ── Camp CRUD ─────────────────────────────────────────────────
     const openCampModal = (camp = null) => {
         setEditingCamp(camp);
         setCampForm(camp ? { title: camp.title, location: camp.location, date: camp.date.slice(0, 10), description: camp.description || '' } : { title: '', location: '', date: '', description: '' });
@@ -319,11 +293,8 @@ export default function OrganisationDashboard() {
         await organisationAPI.deleteCamp(id);
         fetchCamps();
     };
-
-    // ── Misc ──────────────────────────────────────────────────────
     const handleEdit = (item) => { setSelectedInventory(item); setShowEditModal(true); };
 
-    // ── Profile: fetch, cascading location lists, update, change password ──
     const fetchOrgProfile = async () => {
         const data = await organisationAPI.getProfile();
         if (data.success && data.organisation) {
@@ -466,7 +437,6 @@ export default function OrganisationDashboard() {
 
     if (loading) return <div className="flex items-center justify-center h-screen text-gray-600">Loading...</div>;
 
-    // ── Sidebar nav items ─────────────────────────────────────────
     const navItems = [
         { id: 'dashboard', icon: 'fa-gauge', label: 'Dashboard' },
         { id: 'stock', icon: 'fa-flask', label: 'Blood Stock' },
@@ -509,17 +479,15 @@ export default function OrganisationDashboard() {
 
     return (
         <div className="flex h-screen bg-gray-100 overflow-hidden">
-            {/* Mobile overlay */}
+            
             {sidebarOpen && <div className="fixed inset-0 bg-black/50 z-30 lg:hidden" onClick={() => setSidebarOpen(false)} />}
 
-            {/* Sidebar — desktop fixed, mobile drawer */}
             <aside className={`fixed lg:relative z-40 h-full w-64 bg-red-700 text-white flex flex-col transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 flex-shrink-0`}>
                 <SidebarContent />
             </aside>
 
-            {/* Main */}
             <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-                {/* Top bar (mobile) */}
+              
                 <header className="lg:hidden bg-red-700 text-white flex items-center justify-between px-4 py-3 flex-shrink-0">
                     <button onClick={() => setSidebarOpen(true)} className="text-xl"><i className="fa fa-bars"></i></button>
                     <span className="font-bold text-sm">Organisation Dashboard</span>
@@ -536,10 +504,8 @@ export default function OrganisationDashboard() {
                         Welcome, <span className="text-red-600">{user?.name || user?.organisationName}</span>
                     </h1>
 
-                    {/* ── DASHBOARD TAB ─────────────────────────────── */}
                     {activeTab === 'dashboard' && (
                         <>
-                            {/* Stats */}
                             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                                 {[
                                     { label: 'Camps Organized', value: camps.length, color: 'text-red-600' },
@@ -554,7 +520,6 @@ export default function OrganisationDashboard() {
                                 ))}
                             </div>
 
-                            {/* Blood Stock Summary */}
                             <div className="bg-white rounded-lg shadow p-5 mb-6">
                                 <h2 className="font-semibold text-gray-700 mb-4 flex items-center gap-2">
                                     <i className="fa fa-vials text-red-600"></i> Current Blood Stock
@@ -573,7 +538,6 @@ export default function OrganisationDashboard() {
                                         );
                                     })}
                                 </div>
-                                {/* In/Out breakdown */}
                                 <div className="mt-4 pt-4 border-t flex flex-wrap gap-4 text-sm text-gray-600">
                                     <span>📥 <strong>Stock IN:</strong> {inventory.filter(i => i.inventoryType === 'in').reduce((s, i) => s + i.quantity, 0)} units</span>
                                     <span>📤 <strong>Stock OUT:</strong> {inventory.filter(i => i.inventoryType === 'out').reduce((s, i) => s + i.quantity, 0)} units</span>
@@ -581,7 +545,6 @@ export default function OrganisationDashboard() {
                                 </div>
                             </div>
 
-                            {/* Alerts */}
                             {notifications.filter(n => n.type === 'error').length > 0 && (
                                 <div className="bg-red-50 border-l-4 border-red-500 rounded-lg p-4 mb-6">
                                     <h3 className="font-semibold text-red-700 mb-2 flex items-center gap-2"><i className="fa fa-exclamation-circle"></i> Urgent Alerts</h3>
@@ -591,7 +554,6 @@ export default function OrganisationDashboard() {
                                 </div>
                             )}
 
-                            {/* Camp notifications */}
                             {campNotifications.length > 0 && (
                                 <div className="bg-blue-50 border-l-4 border-blue-500 rounded-lg p-4 mb-6">
                                     <h3 className="font-semibold text-blue-700 mb-2 flex items-center gap-2"><i className="fa fa-calendar-check"></i> Reminder: Camp Tomorrow</h3>
@@ -601,7 +563,6 @@ export default function OrganisationDashboard() {
                                 </div>
                             )}
 
-                            {/* Quick add buttons */}
                             <div className="flex flex-wrap gap-3 mb-6">
                                 <button onClick={() => setShowRecordModal(true)} className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm flex items-center gap-2">
                                     <i className="fa fa-heart"></i> Add Donor Record
@@ -617,7 +578,6 @@ export default function OrganisationDashboard() {
                                 </button>
                             </div>
 
-                            {/* Recent records */}
                             <div className="bg-white rounded-lg shadow overflow-x-auto">
                                 <div className="p-4 border-b flex items-center justify-between">
                                     <h2 className="font-semibold text-gray-700">Recent Records</h2>
@@ -661,7 +621,6 @@ export default function OrganisationDashboard() {
                         </>
                     )}
 
-                    {/* ── BLOOD STOCK TAB (with expiry) ────────────── */}
                     {activeTab === 'stock' && (
                         <div>
                             <div className="flex items-center justify-between mb-4">
@@ -695,7 +654,6 @@ export default function OrganisationDashboard() {
                                 })}
                             </div>
 
-                            {/* Per-group breakdown modal */}
                             {selectedStockGroup && (() => {
                                 const data = bloodStockDetails[selectedStockGroup] || { total: 0, expiring: 0, items: [] };
                                 const status = stockStatus(data.total);
@@ -760,7 +718,6 @@ export default function OrganisationDashboard() {
                         </div>
                     )}
 
-                    {/* ── CAMPS TAB ─────────────────────────────────── */}
                     {activeTab === 'camps' && (
                         <div>
                             <div className="flex items-center justify-between mb-4">
@@ -812,8 +769,6 @@ export default function OrganisationDashboard() {
                             )}
                         </div>
                     )}
-
-                    {/* ── DONORS TAB ────────────────────────────────── */}
                     {activeTab === 'donors' && (
                         <div>
                             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-3">
@@ -881,7 +836,6 @@ export default function OrganisationDashboard() {
                         </div>
                     )}
 
-                    {/* ── RECORDS TAB ───────────────────────────────── */}
                     {activeTab === 'records' && (
                         <div>
                             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-3">
@@ -905,7 +859,6 @@ export default function OrganisationDashboard() {
                         </div>
                     )}
 
-                    {/* ── HOSPITALS TAB ─────────────────────────────── */}
                     {activeTab === 'hospitals' && (
                         <div>
                             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-3">
@@ -934,7 +887,6 @@ export default function OrganisationDashboard() {
                         </div>
                     )}
 
-                    {/* ── TRANSFERS TAB ─────────────────────────────── */}
                     {activeTab === 'transfers' && (
                         <div>
                             <div className="flex items-center justify-between mb-4">
@@ -943,8 +895,6 @@ export default function OrganisationDashboard() {
                                     <i className="fa fa-exchange-alt"></i> Send Transfer
                                 </button>
                             </div>
-
-                            {/* Pending / Transfer Records toggle */}
                             <div className="flex gap-2 mb-4 border-b border-gray-200">
                                 {[
                                     { key: 'pending', label: 'Pending Requests', count: transfers.filter(t => t.status === 'requested').length },
@@ -960,7 +910,6 @@ export default function OrganisationDashboard() {
                                 ))}
                             </div>
 
-                            {/* Status legend */}
                             <div className="flex flex-wrap gap-2 mb-4 text-xs">
                                 {[
                                     { s: 'requested', c: 'bg-yellow-100 text-yellow-700', l: '🏥 Hospital Request — Action Needed' },
@@ -1033,7 +982,6 @@ export default function OrganisationDashboard() {
                         </div>
                     )}
 
-                    {/* ── NOTIFICATIONS TAB ─────────────────────────── */}
                     {activeTab === 'notifications' && (
                         <div>
                             <h2 className="text-xl font-bold text-gray-800 mb-4">Notifications</h2>
@@ -1206,7 +1154,6 @@ export default function OrganisationDashboard() {
                 </main>
             </div>
 
-            {/* ── CAMP MODAL ──────────────────────────────────────── */}
             {showCampModal && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-xl w-full max-w-md">
@@ -1259,7 +1206,6 @@ export default function OrganisationDashboard() {
 
             <RecordDonationModal show={showRecordModal} onClose={() => setShowRecordModal(false)} onSuccess={fetchAll} organisationEmail={user?.email} />
 
-            {/* Walk-in Donation Modal */}
             {showWalkinModal && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-xl w-full max-w-md">
@@ -1364,7 +1310,6 @@ export default function OrganisationDashboard() {
             <ManualAddInventoryModal show={showManualAddModal} onClose={() => setShowManualAddModal(false)} onSuccess={fetchAll} userRole="organisation" userEmail={user?.email} bloodStock={bloodStock} />
             <EditInventoryModal show={showEditModal} onClose={() => setShowEditModal(false)} onSuccess={fetchAll} inventoryRecord={selectedInventory} />
 
-            {/* ── ORG REVIEW & APPROVE MODAL ── */}
             {orgActionTransfer && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
@@ -1379,7 +1324,6 @@ export default function OrganisationDashboard() {
                                 {orgActionTransfer.notes && <p className="text-xs text-gray-600 mt-1">Notes: {orgActionTransfer.notes}</p>}
                             </div>
 
-                            {/* Stock check results */}
                             {orgStockCheck && (
                                 <div className="space-y-2">
                                     <h3 className="font-semibold text-gray-700 text-sm">Stock Availability Check:</h3>
@@ -1404,7 +1348,6 @@ export default function OrganisationDashboard() {
                                 </div>
                             )}
 
-                            {/* Set expiry dates per item */}
                             {orgStockCheck?.allSufficient && (
                                 <div className="space-y-2">
                                     <h3 className="font-semibold text-gray-700 text-sm">Set Expiry Dates (required to approve):</h3>
@@ -1442,7 +1385,6 @@ export default function OrganisationDashboard() {
                 </div>
             )}
 
-            {/* ── ORG REJECT MODAL ── */}
             {orgRejectId && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-xl w-full max-w-sm p-6">
@@ -1458,7 +1400,6 @@ export default function OrganisationDashboard() {
                 </div>
             )}
 
-            {/* ── SEND TRANSFER MODAL ── */}
             {showTransferModal && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
@@ -1476,7 +1417,6 @@ export default function OrganisationDashboard() {
                                 </select>
                             </div>
 
-                            {/* Blood items — multiple */}
                             <div>
                                 <div className="flex items-center justify-between mb-2">
                                     <label className="text-sm font-semibold text-gray-700">Blood Items *</label>
@@ -1566,8 +1506,6 @@ export default function OrganisationDashboard() {
         </div>
     );
 }
-
-// ── Reusable records table ──────────────────────────────────
 function RecordsTable({ inventory, onEdit, fmtDate }) {
     return (
         <div className="bg-white rounded-lg shadow overflow-x-auto">

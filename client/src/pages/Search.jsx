@@ -148,7 +148,6 @@ const Search = () => {
                 </div>
             </div>
 
-            {/* Blood Stock Display */}
             <div className="border-t pt-4">
                 <h5 className="font-semibold text-gray-700 mb-3 flex items-center">
                     <Droplet className="w-4 h-4 mr-2 text-red-500" />
@@ -215,7 +214,6 @@ const Search = () => {
                 </div>
             </div>
 
-            {/* Blood Stock Display */}
             <div className="border-t pt-4">
                 <h5 className="font-semibold text-gray-700 mb-3 flex items-center">
                     <Droplet className="w-4 h-4 mr-2 text-red-500" />
@@ -253,7 +251,7 @@ const Search = () => {
         <>
             <Navbar />
             <div className="min-h-screen bg-gray-50">
-                {/* Header */}
+                
                 <section className="bg-gradient-to-r from-red-700 via-red-500 to-red-300 text-white text-center py-16 px-4">
                     <h1 className="text-3xl md:text-4xl font-bold mb-2">
                         {searchType === 'donor' && '🩸 Blood Donors'}
@@ -266,7 +264,6 @@ const Search = () => {
                     </p>
                 </section>
 
-                {/* Results Section */}
                 <section className="max-w-7xl mx-auto px-4 py-12">
                     {loading ? (
                         <div className="text-center py-12">

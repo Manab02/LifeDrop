@@ -6,8 +6,8 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:7000';
 
 const RecordDonationModal = ({ show, onClose, onSuccess, organisationEmail }) => {
     const [donorEmail, setDonorEmail] = useState('');
-    const [donorInfo, setDonorInfo] = useState(null);  // { name, bloodtype }
-    const [donorLookupStatus, setDonorLookupStatus] = useState('');  // 'loading' | 'found' | 'notfound' | ''
+    const [donorInfo, setDonorInfo] = useState(null);  
+    const [donorLookupStatus, setDonorLookupStatus] = useState(''); 
     const [quantity, setQuantity] = useState('');
     const [expiryDate, setExpiryDate] = useState('');
     const [loading, setLoading] = useState(false);
@@ -22,7 +22,6 @@ const RecordDonationModal = ({ show, onClose, onSuccess, organisationEmail }) =>
         }
     }, [show]);
 
-    // Auto-lookup donor after user stops typing email
     useEffect(() => {
         if (!donorEmail || !donorEmail.includes('@')) {
             setDonorInfo(null);
@@ -104,7 +103,6 @@ const RecordDonationModal = ({ show, onClose, onSuccess, organisationEmail }) =>
 
                 <form onSubmit={handleSubmit} className="p-6 space-y-4">
 
-                    {/* Donor Email */}
                     <div>
                         <label className="block text-gray-700 font-semibold mb-2">Donor Email *</label>
                         <input
@@ -115,7 +113,6 @@ const RecordDonationModal = ({ show, onClose, onSuccess, organisationEmail }) =>
                             placeholder="donor@example.com"
                             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:outline-none"
                         />
-                        {/* Lookup status */}
                         {donorLookupStatus === 'loading' && (
                             <p className="text-xs text-gray-500 mt-1"><i className="fa fa-spinner fa-spin mr-1"></i>Looking up donor...</p>
                         )}
@@ -124,7 +121,6 @@ const RecordDonationModal = ({ show, onClose, onSuccess, organisationEmail }) =>
                         )}
                     </div>
 
-                    {/* Auto-filled donor info */}
                     {donorInfo && (
                         <div className="bg-green-50 border border-green-300 rounded-lg p-4 flex items-center gap-4">
                             <div className="text-3xl">🩸</div>
@@ -138,7 +134,6 @@ const RecordDonationModal = ({ show, onClose, onSuccess, organisationEmail }) =>
                         </div>
                     )}
 
-                    {/* Quantity */}
                     <div>
                         <label className="block text-gray-700 font-semibold mb-2">Units Donated *</label>
                         <input
@@ -152,7 +147,6 @@ const RecordDonationModal = ({ show, onClose, onSuccess, organisationEmail }) =>
                         />
                     </div>
 
-                    {/* Expiry Date */}
                     <div>
                         <label className="block text-gray-700 font-semibold mb-2">Expiry Date *</label>
                         <input
@@ -165,7 +159,6 @@ const RecordDonationModal = ({ show, onClose, onSuccess, organisationEmail }) =>
                         />
                     </div>
 
-                    {/* Info note — no org email shown */}
                     <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-sm text-green-700">
                         <p><i className="fa fa-info-circle mr-1"></i> This record will automatically appear in your organisation's dashboard.</p>
                     </div>

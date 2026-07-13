@@ -60,7 +60,6 @@ const DonorDashboard = () => {
             try {
                 const user = JSON.parse(decodeURIComponent(userParam));
                 localStorage.setItem('user', JSON.stringify(user));
-                // Clean the URL
                 window.history.replaceState({}, '', '/donor-dashboard');
             } catch (e) { console.error('Failed to parse user param'); }
         }
@@ -146,15 +145,12 @@ const DonorDashboard = () => {
         try {
             setHospitalsLoading(true);
             setOrgsLoading(true);
-
-            // Fetch hospitals
             const hospitalsResponse = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:7000'}/api/public/get-hospitals`);
             const hospitalsData = await hospitalsResponse.json();
             if (hospitalsData.success) {
                 setHospitals(hospitalsData.data || []);
             }
 
-            // Fetch organisations
             const orgsResponse = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:7000'}/api/public/get-organisations`);
             const orgsData = await orgsResponse.json();
             if (orgsData.success) {
@@ -254,8 +250,6 @@ const DonorDashboard = () => {
 
             if (data.success) {
                 alert('Profile updated successfully!');
-
-                // Update local storage with new data
                 const updatedUser = {
                     ...user,
                     name: profileData.name,
@@ -270,8 +264,6 @@ const DonorDashboard = () => {
                 localStorage.setItem('user', JSON.stringify(updatedUser));
                 setUser(updatedUser);
                 setEditMode(false);
-
-                // Refresh to show updated data
                 window.location.reload();
             } else {
                 alert(data.message || 'Failed to update profile');
@@ -287,13 +279,11 @@ const DonorDashboard = () => {
     const handleAddDonation = async (e) => {
         e.preventDefault();
 
-        // Validate quantity
         if (!donationFormData.quantity || donationFormData.quantity < 1) {
             alert('Please enter a valid blood quantity (minimum 1 unit)');
             return;
         }
 
-        // Validate that at least hospital OR organisation is provided
         if (!donationFormData.hospitalEmail && !donationFormData.organisationEmail) {
             alert('Please select either a Hospital OR an Organisation');
             return;
@@ -302,7 +292,6 @@ const DonorDashboard = () => {
         setDonationLoading(true);
 
         try {
-            // Calculate expiry date (42 days from today)
             const today = new Date();
             const expiryDate = new Date(today);
             expiryDate.setDate(expiryDate.getDate() + 42);
@@ -312,7 +301,7 @@ const DonorDashboard = () => {
                 inventoryType: 'in',
                 bloodGroup: user.bloodtype,
                 quantity: parseInt(donationFormData.quantity),
-                expiryDate: expiryDate.toISOString().split('T')[0], // YYYY-MM-DD format
+                expiryDate: expiryDate.toISOString().split('T')[0], 
                 donor: user.email,
                 hospital: donationFormData.hospitalEmail || undefined,
                 organisation: donationFormData.organisationEmail || undefined,
@@ -335,13 +324,10 @@ const DonorDashboard = () => {
                     organisationEmail: ''
                 });
 
-                // Update availability immediately
                 setIsAvailable(false);
                 const updatedUser = { ...user, isAvailable: false };
                 localStorage.setItem('user', JSON.stringify(updatedUser));
                 setUser(updatedUser);
-
-                // Refresh donations list
                 fetchDonations();
             } else {
                 alert(data.message || 'Failed to add donation');
@@ -396,10 +382,9 @@ const DonorDashboard = () => {
 
     return (
         <div className="flex h-screen bg-gray-100 overflow-hidden">
-            {/* Mobile overlay */}
+        
             {sidebarOpen && <div className="fixed inset-0 bg-black/50 z-30 lg:hidden" onClick={() => setSidebarOpen(false)} />}
 
-            {/* Sidebar */}
             <aside className={`fixed lg:relative z-40 h-full w-64 bg-red-700 text-white flex flex-col flex-shrink-0 transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0`}>
                 <div className="p-5 text-center border-b border-red-500">
                     <h2 className="text-xl font-bold">🩸 Donor Dashboard</h2>
@@ -436,7 +421,6 @@ const DonorDashboard = () => {
                 </div>
             </aside>
 
-            {/* Mobile header */}
             <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
                 <header className="lg:hidden bg-red-700 text-white flex items-center justify-between px-4 py-3 flex-shrink-0">
                     <button onClick={() => setSidebarOpen(true)} className="text-xl"><i className="fa fa-bars"></i></button>
@@ -444,16 +428,13 @@ const DonorDashboard = () => {
                     <span className="w-6"></span>
                 </header>
 
-                {/* Main Content */}
                 <main className="flex-1 p-6 overflow-y-auto">
-                    {/* DASHBOARD TAB */}
                     {activeTab === 'dashboard' && (
                         <>
                             <h1 className="text-2xl font-semibold mb-6 text-gray-800">
                                 Welcome, <span className="text-red-600">{user?.name}</span>
                             </h1>
 
-                            {/* Eligibility Status Banner */}
                             {isEligibleToDonate() ? (
                                 <div className="mb-6 bg-green-50 border-2 border-green-500 rounded-lg p-6 flex items-center gap-4">
                                     <div className="text-green-600 text-5xl">
@@ -481,7 +462,6 @@ const DonorDashboard = () => {
                                 </div>
                             )}
 
-                            {/* Availability Toggle */}
                             <div className="mb-6 bg-white rounded-lg shadow-lg p-6 border-l-4 border-red-600">
                                 <div className="flex items-center justify-between">
                                     <div className="flex-1">
@@ -510,7 +490,6 @@ const DonorDashboard = () => {
                                 </div>
                             </div>
 
-                            {/* Stats Cards */}
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">
                                 <div className="bg-white p-6 rounded-lg shadow-lg border-l-4 border-red-600">
                                     <div className="flex items-center justify-between">
@@ -533,7 +512,6 @@ const DonorDashboard = () => {
                                 </div>
                             </div>
 
-                            {/* Donation Benefits */}
                             <div className="bg-gradient-to-r from-red-50 to-pink-50 border-2 border-red-200 rounded-lg p-6">
                                 <h3 className="text-xl font-bold text-red-700 mb-4 flex items-center gap-2">
                                     <i className="fa fa-star"></i>
@@ -573,7 +551,6 @@ const DonorDashboard = () => {
                         </>
                     )}
 
-                    {/* MY PROFILE TAB */}
                     {activeTab === 'profile' && (
                         <div className="max-w-3xl mx-auto">
                             <h1 className="text-2xl font-semibold mb-6 text-gray-800">My Profile</h1>
@@ -611,7 +588,6 @@ const DonorDashboard = () => {
                                 </div>
 
                                 {!editMode ? (
-                                    // View Mode
                                     <div className="space-y-4">
                                         <div className="grid grid-cols-2 gap-4">
                                             <div>
@@ -649,7 +625,6 @@ const DonorDashboard = () => {
                                         </div>
                                     </div>
                                 ) : (
-                                    // Edit Mode
                                     <form onSubmit={handleProfileUpdate} className="space-y-4">
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                             <div>
@@ -777,7 +752,6 @@ const DonorDashboard = () => {
                         </div>
                     )}
 
-                    {/* MY DONATIONS TAB */}
                     {activeTab === 'donations' && (
                         <>
                             <div className="flex items-center justify-between mb-6">
@@ -864,8 +838,6 @@ const DonorDashboard = () => {
                         </>
                     )}
 
-
-                    {/* Add Donation Modal - UPDATED */}
                     {showAddDonationModal && (
                         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                             <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
@@ -883,7 +855,6 @@ const DonorDashboard = () => {
                                 </div>
 
                                 <form onSubmit={handleAddDonation} className="p-6 space-y-6">
-                                    {/* Information Box */}
                                     <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-800">
                                         <p className="font-semibold mb-2">📋 Important Information:</p>
                                         <ul className="list-disc list-inside space-y-1">
@@ -894,7 +865,6 @@ const DonorDashboard = () => {
                                         </ul>
                                     </div>
 
-                                    {/* Blood Group (Auto-selected, Read-only) */}
                                     <div>
                                         <label className="block text-gray-700 font-semibold mb-2">
                                             Blood Group (Auto-selected)
@@ -907,7 +877,6 @@ const DonorDashboard = () => {
                                         />
                                     </div>
 
-                                    {/* Blood Units - REQUIRED */}
                                     <div>
                                         <label className="block text-gray-700 font-semibold mb-2">
                                             Blood Units * <span className="text-sm font-normal text-gray-500">(Typically 1 unit = 450ml)</span>
@@ -927,7 +896,6 @@ const DonorDashboard = () => {
                                         </p>
                                     </div>
 
-                                    {/* Expiry Date Display (Auto-calculated, Read-only) */}
                                     <div>
                                         <label className="block text-gray-700 font-semibold mb-2">
                                             Expiry Date (Auto-calculated)
@@ -948,7 +916,6 @@ const DonorDashboard = () => {
                                         </p>
                                     </div>
 
-                                    {/* Donor Name (Optional) */}
                                     <div>
                                         <label className="block text-gray-700 font-semibold mb-2">
                                             Donor Name (Optional)
@@ -962,7 +929,6 @@ const DonorDashboard = () => {
                                         />
                                     </div>
 
-                                    {/* Hospital Selection - Dynamically Populated */}
                                     <div>
                                         <label className="block text-gray-700 font-semibold mb-2">
                                             Hospital * <span className="text-sm font-normal text-gray-500">(Select if donating to hospital)</span>
@@ -1000,7 +966,6 @@ const DonorDashboard = () => {
                                         <div className="border-t border-gray-300 flex-1"></div>
                                     </div>
 
-                                    {/* Organisation Selection - Dynamically Populated */}
                                     <div>
                                         <label className="block text-gray-700 font-semibold mb-2">
                                             Organisation * <span className="text-sm font-normal text-gray-500">(Select if donating to organisation)</span>
@@ -1032,7 +997,6 @@ const DonorDashboard = () => {
                                         )}
                                     </div>
 
-                                    {/* Warning if neither selected */}
                                     {!donationFormData.hospitalEmail && !donationFormData.organisationEmail && (
                                         <div className="bg-yellow-50 border border-yellow-300 rounded-lg p-3 text-sm text-yellow-800">
                                             <p className="flex items-center gap-2">
@@ -1042,7 +1006,6 @@ const DonorDashboard = () => {
                                         </div>
                                     )}
 
-                                    {/* 90-Day Warning */}
                                     <div className="bg-orange-50 border border-orange-300 rounded-lg p-4 text-sm text-orange-800">
                                         <p className="font-semibold mb-2 flex items-center gap-2">
                                             <i className="fa fa-clock"></i>
@@ -1054,7 +1017,6 @@ const DonorDashboard = () => {
                                         </p>
                                     </div>
 
-                                    {/* Submit Buttons */}
                                     <div className="flex gap-3 pt-4">
                                         <button
                                             type="submit"

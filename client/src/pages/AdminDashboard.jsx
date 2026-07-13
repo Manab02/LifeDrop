@@ -14,22 +14,14 @@ const AdminDashboard = () => {
   const [pendingTransfers, setPendingTransfers] = useState([]);
   const [rejectTransferId, setRejectTransferId] = useState(null);
   const [showIDs, setShowIDs] = useState(false);
-
-  // Inventory tab: donor / hospital / organisation browser
-  const [inventorySubTab, setInventorySubTab] = useState('hospitals'); // 'donors' | 'hospitals' | 'organisations'
-  const [selectedInvEntity, setSelectedInvEntity] = useState(null); // { type, id, name }
+  const [inventorySubTab, setInventorySubTab] = useState('hospitals'); 
+  const [selectedInvEntity, setSelectedInvEntity] = useState(null); 
   const [entityListSearch, setEntityListSearch] = useState('');
   const [entityTxSearch, setEntityTxSearch] = useState('');
-
-  // Low stock tab: blood-group wise breakdown
   const [selectedLowStockGroup, setSelectedLowStockGroup] = useState(null);
-
-  // Search boxes for the Hospitals / Organisations / Donors management tabs
   const [hospitalsSearch, setHospitalsSearch] = useState('');
   const [organisationsSearch, setOrganisationsSearch] = useState('');
   const [donorsSearch, setDonorsSearch] = useState('');
-
-  // Modals
   const [showDocModal, setShowDocModal] = useState(false);
   const [selectedDoc, setSelectedDoc] = useState(null);
   const [showRejectModal, setShowRejectModal] = useState(false);
@@ -148,8 +140,6 @@ const AdminDashboard = () => {
     if (data.success) setPendingTransfers(data.transfers || []);
   };
 
-  // Switching sidebar sections should always show fresh data,
-  // not whatever was fetched on the initial page load.
   const handleTabChange = (tab) => {
     setActiveTab(tab);
     sessionStorage.setItem('admin_active_tab', tab);
@@ -186,14 +176,12 @@ const AdminDashboard = () => {
     else alert(data.message || 'Failed');
   };
 
-  // Document Viewer
   const handleViewDocument = (userId) => {
     const docUrl = adminAPI.viewDocument(userId);
     setSelectedDoc(docUrl);
     setShowDocModal(true);
   };
 
-  // Approve
   const handleApprove = async (id, type) => {
     if (!window.confirm(`Approve this ${type}?`)) return;
 
@@ -214,7 +202,6 @@ const AdminDashboard = () => {
     }
   };
 
-  // Reject Modal
   const openRejectModal = (id, type) => {
     setRejectTarget({ id, type });
     setRejectReason('');
@@ -245,13 +232,11 @@ const AdminDashboard = () => {
     }
   };
 
-  // Edit
   const handleEdit = (inventoryItem) => {
     setSelectedInventory(inventoryItem);
     setShowEditModal(true);
   };
 
-  // Delete
   const handleDelete = async (id, type) => {
     if (!window.confirm(`Are you sure you want to delete this ${type}?`)) return;
 
@@ -274,7 +259,6 @@ const AdminDashboard = () => {
     }
   };
 
-  // View Transaction Details
   const handleViewTransaction = async (transactionId) => {
     try {
       const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:7000'}/api/admin/transaction-history/${transactionId}`, {
@@ -294,7 +278,6 @@ const AdminDashboard = () => {
     }
   };
 
-  // Approve Transaction
   const handleApproveTransaction = async (transactionId) => {
     if (!window.confirm('Approve this transaction?')) return;
 
@@ -318,7 +301,6 @@ const AdminDashboard = () => {
     }
   };
 
-  //  Reject Transaction
   const handleRejectTransaction = async (transactionId) => {
     const reason = prompt('Enter rejection reason:');
     if (!reason) return;
@@ -344,7 +326,6 @@ const AdminDashboard = () => {
     }
   };
 
-  // Run Manual Expiry Check
   const handleRunExpiryCheck = async () => {
     if (!window.confirm('Run manual expiry check now?')) return;
 
@@ -429,16 +410,13 @@ const AdminDashboard = () => {
           <span className="w-6"></span>
         </header>
 
-        {/* Main Content */}
         <main className="flex-1 overflow-y-auto">
           <div className="p-4 lg:p-6">
-            {/* Header with Show IDs Toggle */}
             <div className="flex items-center justify-between mb-6">
               <h1 className="text-3xl font-bold text-gray-800">
                 Welcome, <span className="text-red-600">{user?.name}</span>
               </h1>
 
-              {/*  Show IDs Toggle */}
               <div className="flex items-center gap-4">
                 <label className="flex items-center gap-2 bg-white px-4 py-2 rounded-lg shadow cursor-pointer hover:bg-gray-50">
                   <input
@@ -452,7 +430,6 @@ const AdminDashboard = () => {
               </div>
             </div>
 
-            {/* Dashboard Stats */}
             {activeTab === 'dashboard' && (
               <>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -497,7 +474,6 @@ const AdminDashboard = () => {
                   </div>
                 </div>
 
-                {/*  Alert Cards */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
                   <div className="bg-white p-6 rounded-xl shadow-lg border-l-4 border-blue-500">
                     <div className="flex items-center justify-between">
@@ -530,7 +506,6 @@ const AdminDashboard = () => {
                   </div>
                 </div>
 
-                {/* Blood Stock Overview */}
                 <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
                   <div className="flex items-center justify-between mb-4">
                     <h2 className="text-2xl font-bold text-gray-800">Blood Stock Overview</h2>
@@ -565,7 +540,6 @@ const AdminDashboard = () => {
                   </div>
                 </div>
 
-                {/* Recent Inventory */}
                 <div className="bg-white rounded-xl shadow-lg p-6">
                   <h2 className="text-2xl font-bold text-gray-800 mb-4">Recent Inventory Records</h2>
                   <div className="overflow-x-auto">
@@ -635,7 +609,6 @@ const AdminDashboard = () => {
               </>
             )}
 
-            {/* Pending Blood Transfers — Admin steps in */}
             {activeTab === 'pending' && (() => {
               const trulyPending = pendingTransfers.filter(t => t.status === 'requested');
               return (
@@ -689,7 +662,6 @@ const AdminDashboard = () => {
               );
             })()}
 
-            {/*  Expiry Warnings Tab */}
             {activeTab === 'expiry' && (
               <div className="bg-white rounded-xl shadow-lg p-6">
                 <h2 className="text-2xl font-bold text-gray-800 mb-4 flex items-center gap-2">
@@ -740,7 +712,6 @@ const AdminDashboard = () => {
               </div>
             )}
 
-            {/* Low Stock Alerts Tab */}
             {activeTab === 'lowstock' && (
               <div className="bg-white rounded-xl shadow-lg p-6">
                 <h2 className="text-2xl font-bold text-gray-800 mb-4 flex items-center gap-2">
@@ -794,14 +765,12 @@ const AdminDashboard = () => {
               </div>
             )}
 
-            {/* Inventory Tab */}
             {activeTab === 'inventory' && (
               <div className="bg-white rounded-xl shadow-lg p-6">
                 <h2 className="text-2xl font-bold text-gray-800 mb-4">
                   Inventory by Category
                 </h2>
 
-                {/* Sub-tabs */}
                 <div className="flex gap-2 mb-5 border-b border-gray-200">
                   {[
                     { key: 'hospitals', label: 'Hospitals', icon: 'fa-hospital', count: hospitals.length },
@@ -820,7 +789,6 @@ const AdminDashboard = () => {
                 </div>
 
                 {!selectedInvEntity ? (
-                  // ----- Entity list view: all registered names -----
                   <>
                     <div className="relative mb-4 max-w-sm">
                       <i className="fa fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
@@ -834,7 +802,6 @@ const AdminDashboard = () => {
                     </div>
 
                     {(() => {
-                      // Rejected hospitals/organisations are not active entities — hide them here.
                       const list = inventorySubTab === 'hospitals' ? hospitals.filter(h => h.approvalStatus !== 'rejected')
                         : inventorySubTab === 'organisations' ? organisations.filter(o => o.approvalStatus !== 'rejected')
                           : donors;
@@ -940,7 +907,6 @@ const AdminDashboard = () => {
                     })()}
                   </>
                 ) : (
-                  // ----- Entity detail view: own transaction records -----
                   <>
                     <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
                       <div>
@@ -968,13 +934,11 @@ const AdminDashboard = () => {
                       let txs = inventory.filter(item => {
                         if (selectedInvEntity.type === 'hospitals') {
                           if (item.hospital?._id !== selectedInvEntity.id) return false;
-                          // Exclude the org's own OUT record that just references this hospital
                           if (item.inventoryType === 'out') return !item.organisation;
                           return true;
                         }
                         if (selectedInvEntity.type === 'organisations') {
                           if (item.organisation?._id !== selectedInvEntity.id) return false;
-                          // Exclude the hospital's own IN record that just references this org
                           if (item.inventoryType === 'in') return !item.hospital;
                           return true;
                         }
@@ -1017,8 +981,6 @@ const AdminDashboard = () => {
                                 const isExpired = item.status === 'expired' || new Date(item.expiryDate) < new Date();
                                 const isExpiringSoon = !isExpired && new Date(item.expiryDate) < new Date(Date.now() + 5 * 24 * 60 * 60 * 1000);
 
-                                // "Own record, other side" — donors see where blood went;
-                                // hospitals/organisations see who/what the transaction was with.
                                 let counterparty = 'N/A';
                                 if (selectedInvEntity.type === 'donors') {
                                   counterparty = item.hospital?.hospitalName || item.organisation?.organisationName || item.target_name || 'N/A';
@@ -1094,7 +1056,6 @@ const AdminDashboard = () => {
               </div>
             )}
 
-            {/* Hospitals Tab */}
             {activeTab === 'hospitals' && (
               <div className="bg-white rounded-xl shadow-lg p-6">
                 <h2 className="text-2xl font-bold text-gray-800 mb-4">
@@ -1196,7 +1157,6 @@ const AdminDashboard = () => {
               </div>
             )}
 
-            {/* Organizations Tab */}
             {activeTab === 'organisations' && (
               <div className="bg-white rounded-xl shadow-lg p-6">
                 <h2 className="text-2xl font-bold text-gray-800 mb-4">
@@ -1298,7 +1258,6 @@ const AdminDashboard = () => {
               </div>
             )}
 
-            {/* Donors Tab */}
             {activeTab === 'donors' && (
               <div className="bg-white rounded-xl shadow-lg p-6">
                 <h2 className="text-2xl font-bold text-gray-800 mb-4">
@@ -1377,7 +1336,6 @@ const AdminDashboard = () => {
           </div>
         </main>
 
-        {/* Document Viewer Modal */}
         {showDocModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden">
@@ -1404,7 +1362,6 @@ const AdminDashboard = () => {
           </div>
         )}
 
-        {/* Reject Modal */}
         {showRejectModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-lg max-w-md w-full">
@@ -1451,7 +1408,6 @@ const AdminDashboard = () => {
           </div>
         )}
 
-        {/* Edit Inventory Modal */}
         <EditInventoryModal
           show={showEditModal}
           onClose={() => setShowEditModal(false)}
@@ -1459,7 +1415,6 @@ const AdminDashboard = () => {
           inventoryRecord={selectedInventory}
         />
 
-        {/* Transaction Details Modal */}
         {showTransactionModal && selectedTransaction && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-lg max-w-3xl w-full max-h-[90vh] overflow-y-auto">
@@ -1473,7 +1428,6 @@ const AdminDashboard = () => {
                 </button>
               </div>
               <div className="p-6">
-                {/* Transaction Info */}
                 <div className="bg-gray-50 rounded-lg p-4 mb-4">
                   <h4 className="font-bold text-gray-800 mb-3">Transaction Information</h4>
                   <div className="grid grid-cols-2 gap-3 text-sm">
@@ -1524,7 +1478,6 @@ const AdminDashboard = () => {
                   </div>
                 </div>
 
-                {/* Source & Target */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                   <div className="bg-green-50 rounded-lg p-4 border-l-4 border-green-500">
                     <h4 className="font-bold text-gray-800 mb-2">📤 Source</h4>
@@ -1559,7 +1512,6 @@ const AdminDashboard = () => {
                   </div>
                 </div>
 
-                {/* Audit Trail */}
                 {selectedTransaction.auditLogs && selectedTransaction.auditLogs.length > 0 && (
                   <div className="bg-gray-50 rounded-lg p-4">
                     <h4 className="font-bold text-gray-800 mb-3">📋 Audit Trail</h4>
@@ -1586,7 +1538,6 @@ const AdminDashboard = () => {
 
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
 
-        {/* Reject Transfer Modal */}
         {rejectTransferId && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-xl w-full max-w-sm p-6">
@@ -1602,7 +1553,6 @@ const AdminDashboard = () => {
           </div>
         )}
 
-        {/* Blood Group Breakdown Modal */}
         {selectedBloodGroup && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-xl w-full max-w-2xl max-h-[85vh] flex flex-col">
@@ -1635,7 +1585,6 @@ const AdminDashboard = () => {
             </div>
           </div>
         )}
-        {/* Low Stock — Blood Group Drill-down Modal */}
         {selectedLowStockGroup && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-xl w-full max-w-2xl max-h-[85vh] flex flex-col">

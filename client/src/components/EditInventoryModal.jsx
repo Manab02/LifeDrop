@@ -70,7 +70,6 @@ const EditInventoryModal = ({ show, onClose, onSuccess, inventoryRecord }) => {
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-xl max-w-md w-full">
-                {/* Header */}
                 <div className="bg-blue-600 text-white px-6 py-4 rounded-t-xl flex items-center justify-between">
                     <h2 className="text-xl font-bold flex items-center gap-2">
                         <i className="fa fa-edit"></i>
@@ -84,7 +83,6 @@ const EditInventoryModal = ({ show, onClose, onSuccess, inventoryRecord }) => {
                     </button>
                 </div>
 
-                {/* Form */}
                 <form onSubmit={handleSubmit} className="p-6 space-y-4">
                     {inventoryRecord && (
                         <div className="bg-gray-50 rounded-lg p-3 text-sm">
@@ -102,7 +100,6 @@ const EditInventoryModal = ({ show, onClose, onSuccess, inventoryRecord }) => {
                         </div>
                     )}
 
-                    {/* Blood Group */}
                     <div>
                         <label className="block text-gray-700 font-semibold mb-2">
                             Blood Group *
@@ -121,7 +118,6 @@ const EditInventoryModal = ({ show, onClose, onSuccess, inventoryRecord }) => {
                         </select>
                     </div>
 
-                    {/* Quantity */}
                     <div>
                         <label className="block text-gray-700 font-semibold mb-2">
                             Quantity (units) *
@@ -138,7 +134,6 @@ const EditInventoryModal = ({ show, onClose, onSuccess, inventoryRecord }) => {
                         />
                     </div>
 
-                    {/* Expiry Date */}
                     <div>
                         <label className="block text-gray-700 font-semibold mb-2">
                             Expiry Date *
@@ -154,7 +149,6 @@ const EditInventoryModal = ({ show, onClose, onSuccess, inventoryRecord }) => {
                         />
                     </div>
 
-                    {/* Info Note */}
                     <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm text-yellow-800">
                         <p className="flex items-start gap-2">
                             <i className="fa fa-info-circle mt-0.5"></i>
@@ -162,7 +156,6 @@ const EditInventoryModal = ({ show, onClose, onSuccess, inventoryRecord }) => {
                         </p>
                     </div>
 
-                    {/* Buttons */}
                     <div className="flex gap-3 pt-4">
                         <button
                             type="submit"

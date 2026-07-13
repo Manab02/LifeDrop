@@ -5,7 +5,7 @@ import { authAPI } from '../services/api';
 
 const ResetPassword = () => {
     const navigate = useNavigate();
-    const [step, setStep] = useState(1);                // 1: Email, 2: OTP & Password
+    const [step, setStep] = useState(1);            
     const [email, setEmail] = useState('');
     const [otp, setOtp] = useState(['', '', '', '', '', '']);
     const [newPassword, setNewPassword] = useState('');
@@ -24,7 +24,6 @@ const ResetPassword = () => {
         newOtp[index] = value;
         setOtp(newOtp);
 
-        // Auto-focus next input
         if (value && index < 5) {
             document.getElementById(`reset-otp-${index + 1}`).focus();
         }
@@ -135,7 +134,7 @@ const ResetPassword = () => {
                 </div>
 
                 {step === 1 ? (
-                    // Step 1: Email Input
+                   
                     <form onSubmit={handleSendOtp}>
                         <div className="relative mb-6">
                             <input
@@ -179,7 +178,6 @@ const ResetPassword = () => {
                         </div>
                     </form>
                 ) : (
-                    // Step 2: OTP & New Password
                     <form onSubmit={handleResetPassword}>
                         <div className="mb-6">
                             <label className="block text-sm font-semibold text-gray-700 mb-3 text-center">
@@ -201,7 +199,6 @@ const ResetPassword = () => {
                             </div>
                         </div>
 
-                        {/* New Password */}
                         <div className="relative mb-6">
                             <input
                                 type={showPassword ? 'text' : 'password'}
@@ -231,7 +228,6 @@ const ResetPassword = () => {
                             </button>
                         </div>
 
-                        {/* Confirm Password */}
                         <div className="relative mb-6">
                             <input
                                 type={showConfirmPassword ? 'text' : 'password'}

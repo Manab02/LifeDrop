@@ -16,14 +16,6 @@ const transferSchema = new mongoose.Schema({
     items: { type: [transferItemSchema], required: true },
     notes: { type: String, default: '' },
 
-    // Status flow:
-    // 'requested'        → hospital sent a blood request to org
-    // 'org_approved'     → org confirmed stock & sent blood
-    // 'org_rejected'     → org rejected (insufficient stock or other reason)
-    // 'hospital_approved'→ hospital confirmed receiving
-    // 'hospital_rejected'→ hospital rejected
-    // 'admin_approved'   → admin finalised → inventory records created
-    // 'admin_rejected'   → admin rejected
     status: {
         type: String,
         enum: ['requested', 'org_approved', 'org_rejected', 'hospital_approved', 'hospital_rejected', 'admin_approved', 'admin_rejected'],

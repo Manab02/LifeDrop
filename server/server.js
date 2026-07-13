@@ -25,10 +25,8 @@ const __dirname = path.dirname(__filename);
 // Rest object
 const app = express();
 
-// PORT
 const port = process.env.PORT || 7000;
 
-// Connect to database
 connectDB();
 
 // Middlewares
@@ -85,7 +83,6 @@ app.use((err, req, res, next) => {
     });
 });
 
-// 404 handler
 app.use('/api', (req, res) => {
     res.status(404).json({
         success: false,
@@ -116,13 +113,12 @@ app.listen(port, () => {
     console.log(`⏰ Expiry check scheduled: Every 24 hours`);
     console.log('='.repeat(50));
 });
-// Handle unhandled promise rejections
+
 process.on('unhandledRejection', (err) => {
     console.error('Unhandled Promise Rejection:', err);
     process.exit(1);
 });
 
-// Handle uncaught exceptions
 process.on('uncaughtException', (err) => {
     console.error('Uncaught Exception:', err);
     process.exit(1);
@@ -133,7 +129,6 @@ process.on('SIGTERM', () => {
     console.log('SIGTERM received. Shutting down gracefully...');
     process.exit(0);
 });
-
 process.on('SIGINT', () => {
     console.log('SIGINT received. Shutting down gracefully...');
     process.exit(0);

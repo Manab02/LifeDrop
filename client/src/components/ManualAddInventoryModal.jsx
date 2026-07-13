@@ -88,7 +88,6 @@ const ManualAddInventoryModal = ({ show, onClose, onSuccess, userEmail, bloodSto
                 </div>
 
                 <form onSubmit={handleSubmit} className="p-6 space-y-5">
-                    {/* Hospital + patient + notes */}
                     <div className="bg-red-50 p-4 rounded-lg border border-red-200 space-y-3">
                         <h3 className="font-semibold text-red-800">📤 Send To</h3>
                         <div>
@@ -113,7 +112,6 @@ const ManualAddInventoryModal = ({ show, onClose, onSuccess, userEmail, bloodSto
                         </div>
                     </div>
 
-                    {/* Blood items — multi */}
                     <div>
                         <div className="flex items-center justify-between mb-2">
                             <label className="text-gray-700 font-semibold">Blood Group(s) *</label>

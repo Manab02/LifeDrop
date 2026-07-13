@@ -9,7 +9,7 @@ const EmailVerify = () => {
     const [resendLoading, setResendLoading] = useState(false);
     const [timer, setTimer] = useState(120);                 // 2 minutes otp validation
     const [canResend, setCanResend] = useState(false);
-    const hasOtpBeenSent = useRef(false);                     // Track if OTP has been sent
+    const hasOtpBeenSent = useRef(false);                     
 
     useEffect(() => {
         const user = JSON.parse(localStorage.getItem('user') || '{}');
@@ -35,8 +35,7 @@ const EmailVerify = () => {
         }, 1000);
 
         return () => clearInterval(interval);
-    }, []);                                     // Empty dependency array ensures this runs only once
-
+    }, []);                                     
     const sendOtp = async () => {
         try {
             const data = await authAPI.sendVerifyOtp();
@@ -107,7 +106,6 @@ const EmailVerify = () => {
         if (/^\d+$/.test(pastedData)) {
             const newOtp = pastedData.split('');
             setOtp([...newOtp, ...Array(6 - newOtp.length).fill('')]);
-            // Focus last filled input or first empty
             const focusIndex = Math.min(pastedData.length, 5);
             document.getElementById(`otp-${focusIndex}`).focus();
         }
@@ -133,8 +131,6 @@ const EmailVerify = () => {
 
             if (data.success) {
                 alert('Email verified successfully!');
-
-                // Update user data
                 user.isAccountVerified = true;
                 localStorage.setItem('user', JSON.stringify(user));
 
@@ -176,7 +172,7 @@ const EmailVerify = () => {
     return (
         <div className="min-h-screen bg-gradient-to-br from-red-50 to-red-100 flex items-center justify-center p-4">
             <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8">
-                {/* Header */}
+            
                 <div className="text-center mb-8">
                     <div className="bg-red-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
                         <i className="fa fa-envelope text-red-600 text-3xl"></i>
@@ -187,7 +183,6 @@ const EmailVerify = () => {
                     </p>
                 </div>
 
-                {/* OTP Form */}
                 <form onSubmit={handleVerify} className="space-y-6">
                     <div>
                         <label className="block text-gray-700 font-semibold mb-3 text-center">
@@ -211,7 +206,6 @@ const EmailVerify = () => {
                         </div>
                     </div>
 
-                    {/* Timer */}
                     <div className="text-center">
                         {!canResend ? (
                             <p className="text-gray-600">
@@ -240,7 +234,6 @@ const EmailVerify = () => {
                         )}
                     </div>
 
-                    {/* Verify Button */}
                     <button
                         type="submit"
                         disabled={loading}
@@ -260,7 +253,6 @@ const EmailVerify = () => {
                     </button>
                 </form>
 
-                {/* Back to Dashboard */}
                 <div className="mt-6 text-center">
                     <button
                         onClick={() => {
@@ -289,7 +281,6 @@ const EmailVerify = () => {
                     </button>
                 </div>
 
-                {/* Info Box */}
                 <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
                     <p className="text-sm text-blue-800">
                         <i className="fa fa-info-circle mr-2"></i>

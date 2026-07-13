@@ -15,7 +15,6 @@ const Footer = () => {
     return (
         <footer className="bg-gray-900 text-white py-10 px-6">
             <div className="max-w-7xl mx-auto grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8">
-                {/* LifeDrop */}
                 <div>
                     <h2 className="text-xl font-bold mb-2 tracking-wide">LifeDrop</h2>
                     <div className="w-16 h-0.5 bg-red-600 mb-4"></div>
@@ -40,7 +39,6 @@ const Footer = () => {
                     </div>
                 </div>
 
-                {/* Quick Links */}
                 <div>
                     <h2 className="text-xl font-bold mb-2 tracking-wide">QUICK LINKS</h2>
                     <div className="w-28 h-0.5 bg-red-600 mb-4"></div>
@@ -58,7 +56,6 @@ const Footer = () => {
                     </ul>
                 </div>
 
-                {/* About */}
                 <div>
                     <h2 className="text-xl font-bold mb-2 tracking-wide">ABOUT</h2>
                     <div className="w-16 h-0.5 bg-red-600 mb-4"></div>

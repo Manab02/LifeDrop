@@ -10,8 +10,8 @@ import {
 
 const router = express.Router();
 
-router.post('/create', userAuth, orgInitiateTransfer);       // org pushes blood to hospital
-router.post('/request', userAuth, createRequest);            // hospital requests blood from org
+router.post('/create', userAuth, orgInitiateTransfer);       
+router.post('/request', userAuth, createRequest);            
 router.get('/check-stock/:transferId', userAuth, checkRequestStock);
 router.post('/org-approve/:transferId', userAuth, orgApproveRequest);
 router.post('/org-reject/:transferId', userAuth, orgRejectRequest);

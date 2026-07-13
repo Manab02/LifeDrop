@@ -256,7 +256,6 @@ export const hospitalAPI = {
 };
 
 export const transferAPI = {
-    // Org pushes blood directly to a hospital (immediate, no approval needed)
     create: (data) => apiCall('/api/transfer/create', { method: 'POST', body: JSON.stringify(data) }),
     // Hospital sends request to org
     createRequest: (data) => apiCall('/api/transfer/request', { method: 'POST', body: JSON.stringify(data) }),

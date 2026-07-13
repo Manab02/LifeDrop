@@ -1222,7 +1222,6 @@ router.post('/reject-transaction/:transactionId', userAuth, isAdmin, async (req,
     }
 });
 
-// Blood stock breakdown per org/hospital for a given blood group
 router.get('/blood-stock-breakdown/:bloodGroup', userAuth, isAdmin, async (req, res) => {
     try {
         const { bloodGroup } = req.params;
@@ -1261,7 +1260,6 @@ router.get('/blood-stock-breakdown/:bloodGroup', userAuth, isAdmin, async (req, 
     }
 });
 
-// Blood group breakdown by org/hospital
 router.get('/blood-group-details/:group', userAuth, isAdmin, async (req, res) => {
     try {
         const { group } = req.params;
@@ -1269,14 +1267,6 @@ router.get('/blood-group-details/:group', userAuth, isAdmin, async (req, res) =>
             .populate('organisation', 'organisationName')
             .populate('hospital', 'hospitalName');
 
-        // Build net per entity — attribute each record to its TRUE owner.
-        // A transfer record has BOTH organisation and hospital set, so we can't
-        // just pick "organisation || hospital" (that always favors org and hides
-        // the hospital's own side entirely). Ownership depends on direction:
-        //   - IN record referencing a hospital  → belongs to that hospital (they gained stock)
-        //   - OUT record referencing an org      → belongs to that org (they lost stock)
-        //   - IN record referencing only an org  → belongs to that org (donor donation)
-        //   - OUT record referencing only a hosp → belongs to that hospital (they used stock)
         const entityMap = {};
         inventory.forEach(item => {
             let entity = null, type = null;

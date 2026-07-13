@@ -71,7 +71,6 @@ const Register = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Password validation
     if (formData.password !== formData.confirmPassword) {
       Swal.fire('Error', 'Passwords do not match!', 'error');
       return;
@@ -112,7 +111,6 @@ const Register = () => {
       submitData.append('password', formData.password);
       submitData.append('phone', formData.phone);
 
-      // Add role-specific fields
       if (formData.role === 'donor') {
         submitData.append('name', formData.name);
         submitData.append('bloodtype', formData.bloodtype);
@@ -202,7 +200,6 @@ const Register = () => {
             </select>
           </div>
 
-          {/* Name Fields */}
           {isDonor && (
             <div>
               <label className="block text-red-600 font-semibold mb-2">Full Name *</label>
@@ -247,8 +244,6 @@ const Register = () => {
               />
             </div>
           )}
-
-          {/* Email & Phone */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label className="block text-red-600 font-semibold mb-2">Email *</label>
@@ -280,7 +275,6 @@ const Register = () => {
             </div>
           </div>
 
-          {/* Passwords */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="relative">
               <label className="block text-red-600 font-semibold mb-2">Password *</label>
@@ -327,7 +321,6 @@ const Register = () => {
             </div>
           </div>
 
-          {/* Document Upload for Hospital/Organisation */}
           {(isHospital || isOrganisation) && (
             <DocumentUpload
               onFileSelect={setDocument}
@@ -335,7 +328,6 @@ const Register = () => {
             />
           )}
 
-          {/* Location Fields - for Donor, Hospital, and Organisation */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div>
               <label className="block text-red-600 font-semibold mb-2">State *</label>
@@ -388,10 +380,8 @@ const Register = () => {
             </div>
           </div>
 
-          {/* Donor-Specific Fields */}
           {isDonor && (
             <>
-              {/* Age and Blood Group */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-red-600 font-semibold mb-2">Age *</label>
@@ -425,7 +415,6 @@ const Register = () => {
                 </div>
               </div>
 
-              {/* Authorization Checkbox */}
               <div className="flex items-start space-x-3">
                 <input
                   type="checkbox"
@@ -442,7 +431,6 @@ const Register = () => {
             </>
           )}
 
-          {/* Submit Button */}
           <button
             type="submit"
             disabled={loading}
@@ -460,8 +448,6 @@ const Register = () => {
               'Register'
             )}
           </button>
-
-          {/* Login Link */}
           <p className="text-center text-sm mt-4">
             Already have an account?{' '}
             <a href="/login" className="text-red-600 font-semibold hover:underline">

@@ -4,7 +4,6 @@ import inventoryModels from "../models/inventoryModels.js";
 
 const router = express.Router();
 
-// ── Helpers: compute a hospital's / organisation's own real stock ────────
 const getHospitalStock = async (hospitalId) => {
     const inventory = await inventoryModels.find({
         hospital: hospitalId,
@@ -47,7 +46,6 @@ const getOrgStockForSearch = async (orgId) => {
     return bloodStock;
 };
 
-// ── Helper: run a location query at a given precision, filtering by stock ──
 const findHospitalsAtLevel = async (baseQuery, locationFilter, bloodGroup, matchLevel) => {
     const hospitals = await userModel.find({ ...baseQuery, ...locationFilter }).select('hospitalName email phone address');
     const withStock = await Promise.all(hospitals.map(async (hospital) => {
@@ -114,7 +112,6 @@ router.post('/search', async (req, res) => {
                 return donors.map(d => ({ ...d.toObject(), matchLevel }));
             };
 
-            // Same city -> district -> state fallback as hospitals/organisations.
             let donorResults = [];
             if (city) donorResults = await runDonorQuery({ 'address.state': state, 'address.district': district, 'address.city': city }, 'city');
             if (donorResults.length === 0 && district) donorResults = await runDonorQuery({ 'address.state': state, 'address.district': district }, 'district');
@@ -131,9 +128,6 @@ router.post('/search', async (req, res) => {
         } else if (type === 'hospital') {
             const baseQuery = { role: 'hospital', approvalStatus: 'approved', isAccountVerified: true };
 
-            // Try exact city first; if nothing matches, widen to the whole
-            // district, then the whole state — so a real nearby hospital
-            // still turns up instead of an empty results page.
             let filteredHospitals = [];
             if (city) {
                 filteredHospitals = await findHospitalsAtLevel(baseQuery, { 'address.state': state, 'address.district': district, 'address.city': city }, bloodGroup, 'city');
@@ -156,9 +150,6 @@ router.post('/search', async (req, res) => {
         } else if (type === 'organisation') {
             const baseQuery = { role: 'organisation', approvalStatus: 'approved', isAccountVerified: true };
 
-            // Same city -> district -> state fallback as hospitals, so a
-            // nearby organisation with the requested blood group still shows
-            // up instead of an empty page when the exact city has none.
             let filteredOrganisations = [];
             if (city) {
                 filteredOrganisations = await findOrganisationsAtLevel(baseQuery, { 'address.state': state, 'address.district': district, 'address.city': city }, bloodGroup, 'city');

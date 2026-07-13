@@ -80,12 +80,6 @@ export const checkExpiringSoon = async (userId = null) => {
         if (expiringItems.length === 0) {
             return { success: true, warnings: [], totalItemsExpiring: 0 };
         }
-
-        // For each item, figure out its TRUE owner — a hospital<->organisation
-        // transfer record has both fields set, so we can't just pick one.
-        // Then compute that owner's real net stock for that blood group, so a
-        // batch that's already been fully used (OUT) doesn't get reported as
-        // "expiring soon" — it's gone, not about to expire.
         const ownerKeys = new Set();
         const ownerOf = (item) => {
             if (item.hospital) return { type: 'hospital', id: item.hospital._id.toString(), name: item.hospital.hospitalName };
@@ -98,7 +92,7 @@ export const checkExpiringSoon = async (userId = null) => {
             if (owner) ownerKeys.add(`${owner.type}:${owner.id}`);
         });
 
-        const netStockCache = {}; // "hospital:id:bloodGroup" -> net units
+        const netStockCache = {}; 
         for (const key of ownerKeys) {
             const [type, id] = key.split(':');
             const ownField = type === 'hospital' ? 'hospital' : 'organisation';
@@ -111,8 +105,6 @@ export const checkExpiringSoon = async (userId = null) => {
             });
 
             records.forEach(r => {
-                // Structural ownership check, same as elsewhere in the app:
-                // skip the counterparty's mirrored copy of a transfer.
                 const isOwnRecord = type === 'hospital'
                     ? (r.inventoryType === 'in' || (r.inventoryType === 'out' && !r.organisation))
                     : (r.inventoryType === 'out' || (r.inventoryType === 'in' && !r.hospital));
@@ -130,9 +122,8 @@ export const checkExpiringSoon = async (userId = null) => {
 
             const cacheKey = `${owner.type}:${owner.id}:${item.bloodGroup}`;
             const netStock = Math.max(0, netStockCache[cacheKey] || 0);
-            if (netStock <= 0) return; // fully used up — not "expiring", just gone
+            if (netStock <= 0) return; 
 
-            // Don't report more units expiring than the owner actually still has
             const reportedQuantity = Math.min(item.quantity, netStock);
             if (reportedQuantity <= 0) return;
 

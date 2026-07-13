@@ -209,9 +209,6 @@ export const createInventory = async (req, res) => {
                 inventoryData.target_type = 'organisation';
             }
 
-            // A hospital crediting their own stock manually (e.g. after
-            // receiving a direct send from an org, or a walk-in donor at
-            // the hospital itself).
             if (hospital) {
                 const hospitalQuery = mongoose.Types.ObjectId.isValid(hospital)
                     ? { $or: [{ email: hospital }, { _id: hospital }], role: 'hospital' }
@@ -296,8 +293,6 @@ export const getInventoryController = async (req, res) => {
         let query = {};
 
         if (user.role === 'organisation') {
-            // Exclude hospital-side IN records that just reference this organisation
-            // (that's the hospital's copy of a transfer we sent out — not our own inflow).
             query = {
                 organisation: req.body.userId,
                 $or: [
@@ -306,7 +301,7 @@ export const getInventoryController = async (req, res) => {
                 ]
             };
         } else if (user.role === 'hospital') {
-            // Exclude org-side OUT records that just reference the hospital
+        
             query = {
                 hospital: req.body.userId,
                 $or: [
@@ -815,7 +810,6 @@ export default {
     rejectTransaction
 };
 
-// Walk-in / unregistered donor donation (exported separately for route use)
 export const createWalkinDonation = async (req, res) => {
     try {
         const { donorName, campName, bloodGroup, quantity, expiryDate, organisation } = req.body;

@@ -2,7 +2,6 @@ import transferModel from "../models/transferModel.js";
 import inventoryModels from "../models/inventoryModels.js";
 import userModel from "../models/userModels.js";
 
-// ── Helper: net stock for an org ─────────────────────────────────
 const getOrgStock = async (orgId) => {
     const inv = await inventoryModels.find({
         organisation: orgId,
@@ -21,7 +20,6 @@ const getOrgStock = async (orgId) => {
     return stock;
 };
 
-// ── Helper: org's OUT record only (their stock decreases now) ────
 const createOrgOutRecords = async (transfer) => {
     const records = [];
     for (const item of transfer.items) {
@@ -47,7 +45,6 @@ const createOrgOutRecords = async (transfer) => {
     return records;
 };
 
-// ── Helper: hospital's IN record only (their stock increases now) ─
 const createHospitalInRecords = async (transfer) => {
     const records = [];
     for (const item of transfer.items) {
@@ -73,7 +70,6 @@ const createHospitalInRecords = async (transfer) => {
     return records;
 };
 
-// ── Helper: give the org back stock the hospital rejected ────────
 const createOrgReturnRecords = async (transfer, reason) => {
     const records = [];
     for (const item of transfer.items) {
@@ -94,7 +90,6 @@ const createOrgReturnRecords = async (transfer, reason) => {
     return records;
 };
 
-// ── 1. Org initiates transfer directly (no approval needed) ──────
 export const orgInitiateTransfer = async (req, res) => {
     try {
         const { hospitalId, items, notes } = req.body;
@@ -124,7 +119,7 @@ export const orgInitiateTransfer = async (req, res) => {
             hospital: hospitalId,
             items: items.map(i => ({ bloodGroup: i.bloodGroup, quantity: parseInt(i.quantity), expiryDate: new Date(i.expiryDate) })),
             notes: notes || '',
-            status: 'org_approved',   // sent — this is a notification to the hospital, not an auto-credit
+            status: 'org_approved',  
             initiatedBy: 'organisation',
             orgApprovedBy: req.body.userId,
             orgApprovedAt: new Date()
@@ -141,7 +136,6 @@ export const orgInitiateTransfer = async (req, res) => {
     }
 };
 
-// ── 2. Hospital sends blood request to org ────────────────────────
 export const createRequest = async (req, res) => {
     try {
         const { organisationId, items, notes } = req.body;
@@ -178,7 +172,6 @@ export const createRequest = async (req, res) => {
     }
 };
 
-// ── 3. Org checks stock for a request ────────────────────────────
 export const checkRequestStock = async (req, res) => {
     try {
         const { transferId } = req.params;
@@ -203,7 +196,6 @@ export const checkRequestStock = async (req, res) => {
     }
 };
 
-// ── 4. Org approves hospital request → creates inventory immediately
 export const orgApproveRequest = async (req, res) => {
     try {
         const { transferId } = req.params;
@@ -219,7 +211,7 @@ export const orgApproveRequest = async (req, res) => {
         if (transfer.status !== 'requested')
             return res.json({ success: false, message: `Cannot approve — status is ${transfer.status}` });
 
-        // Re-validate stock
+        
         const stock = await getOrgStock(req.body.userId);
         for (const item of transfer.items) {
             const avail = stock[item.bloodGroup] || 0;
@@ -227,7 +219,6 @@ export const orgApproveRequest = async (req, res) => {
                 return res.json({ success: false, message: `Insufficient ${item.bloodGroup}: need ${item.quantity}, have ${avail}` });
         }
 
-        // Merge expiry dates from org's approval form
         transfer.items = transfer.items.map((item, idx) => ({
             bloodGroup: item.bloodGroup,
             quantity: item.quantity,
@@ -235,7 +226,7 @@ export const orgApproveRequest = async (req, res) => {
         }));
 
         const records = await createOrgOutRecords(transfer);
-        transfer.status = 'org_approved';   // awaiting hospital to confirm receipt
+        transfer.status = 'org_approved';   
         transfer.orgApprovedBy = req.body.userId;
         transfer.orgApprovedAt = new Date();
         transfer.inventoryRecords = records;
@@ -247,7 +238,6 @@ export const orgApproveRequest = async (req, res) => {
     }
 };
 
-// ── 5. Org rejects hospital request ──────────────────────────────
 export const orgRejectRequest = async (req, res) => {
     try {
         const { transferId } = req.params;
@@ -271,9 +261,6 @@ export const orgRejectRequest = async (req, res) => {
     }
 };
 
-// ── 5b. Hospital confirms receipt of a request the org already sent ──
-// Only makes sense for hospital-initiated requests (org already decreased
-// their stock at approval time) — creates the hospital's own IN record now.
 export const hospitalApproveTransfer = async (req, res) => {
     try {
         const { transferId } = req.params;
@@ -303,7 +290,6 @@ export const hospitalApproveTransfer = async (req, res) => {
     }
 };
 
-// ── 5c. Hospital rejects — gives the org their stock back ────────────
 export const hospitalRejectTransfer = async (req, res) => {
     try {
         const { transferId } = req.params;
@@ -333,7 +319,6 @@ export const hospitalRejectTransfer = async (req, res) => {
     }
 };
 
-// ── 6. Admin approves any stuck/pending transfer ──────────────────
 export const adminApprove = async (req, res) => {
     try {
         const { transferId } = req.params;
@@ -348,7 +333,6 @@ export const adminApprove = async (req, res) => {
         if (['hospital_approved', 'admin_approved'].includes(transfer.status))
             return res.json({ success: false, message: 'Transfer already completed' });
 
-        // Stock check only needed if the org side hasn't already been deducted
         if (transfer.status !== 'org_approved') {
             const stock = await getOrgStock(transfer.organisation._id);
             for (const item of transfer.items) {
@@ -358,7 +342,6 @@ export const adminApprove = async (req, res) => {
             }
         }
 
-        // Add default expiry if missing
         transfer.items = transfer.items.map(item => ({
             bloodGroup: item.bloodGroup,
             quantity: item.quantity,
@@ -383,7 +366,6 @@ export const adminApprove = async (req, res) => {
     }
 };
 
-// ── 7. Admin rejects ─────────────────────────────────────────────
 export const adminReject = async (req, res) => {
     try {
         const { transferId } = req.params;
@@ -405,8 +387,6 @@ export const adminReject = async (req, res) => {
     }
 };
 
-// ── 5d. Hospital dismisses a push-notification from their Pending list ──
-// (Used after they've manually added their own record, or just to clear it.)
 export const acknowledgeTransfer = async (req, res) => {
     try {
         const { transferId } = req.params;
@@ -424,7 +404,6 @@ export const acknowledgeTransfer = async (req, res) => {
     }
 };
 
-// ── GET: transfers for org ────────────────────────────────────────
 export const getOrgTransfers = async (req, res) => {
     try {
         const transfers = await transferModel.find({ organisation: req.body.userId })
@@ -436,7 +415,6 @@ export const getOrgTransfers = async (req, res) => {
     }
 };
 
-// ── GET: transfers for hospital ───────────────────────────────────
 export const getHospitalTransfers = async (req, res) => {
     try {
         const transfers = await transferModel.find({ hospital: req.body.userId })
@@ -448,7 +426,6 @@ export const getHospitalTransfers = async (req, res) => {
     }
 };
 
-// ── GET: admin — all non-completed transfers ──────────────────────
 export const getAllPendingTransfers = async (req, res) => {
     try {
         const user = await userModel.findById(req.body.userId);
