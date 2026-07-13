@@ -1,4 +1,3 @@
-
 import mongoose from "mongoose";
 
 export const inventorySchema = new mongoose.Schema({
@@ -29,13 +28,7 @@ export const inventorySchema = new mongoose.Schema({
 
     expiryDate: {
         type: Date,
-        required: [true, 'Expiry date is mandatory for all blood units'],
-        validate: {
-            validator: function (value) {
-                return value > new Date();
-            },
-            message: 'Expiry date must be in the future'
-        }
+        required: [true, 'Expiry date is mandatory for all blood units']
     },
 
     verified: {
@@ -116,7 +109,6 @@ export const inventorySchema = new mongoose.Schema({
         default: null
     },
 
-    // APPROVAL TRACKING
     approvedBy: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "user",
