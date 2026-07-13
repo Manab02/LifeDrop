@@ -9,7 +9,7 @@ import EmailVerify from './pages/EmailVerify';
 import ResetPassword from './pages/ResetPassword';
 import NotFound from './pages/NotFound';
 import CompleteProfile from './pages/Completeprofile';
-import ProtectedRoute from './components/ProtectedRoute';
+import ProtectedRoute from './components/Protectedroute';
 import AdminDashboard from './pages/AdminDashboard';
 import DonorDashboard from './pages/DonorDashboard';
 import HospitalDashboard from './pages/HospitalDashboard';
