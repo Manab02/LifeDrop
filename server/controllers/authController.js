@@ -15,6 +15,15 @@ export const register = async (req, res) => {
         return res.json({ success: false, message: 'Email, password, role, and phone are required!' });
     }
 
+    if (!/^\d{10}$/.test(phone)) {
+        return res.json({ success: false, message: 'Phone number must be exactly 10 digits!' });
+    }
+
+    const strongPasswordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
+    if (!strongPasswordRegex.test(password)) {
+        return res.json({ success: false, message: 'Password must be at least 8 characters and include an uppercase letter, a lowercase letter, a number, and a symbol!' });
+    }
+
     if (role === 'donor' && (!name || !bloodtype || !age || !state || !district || !city)) {
         console.log(' Missing donor fields');
         return res.json({ success: false, message: 'Please provide all donor details!' });
@@ -473,6 +482,11 @@ export const resetPassword = async (req, res) => {
         return res.json({ success: false, message: "Email, OTP and new password are required" });
     }
 
+    const strongPasswordRegexReset = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
+    if (!strongPasswordRegexReset.test(newPassword)) {
+        return res.json({ success: false, message: 'Password must be at least 8 characters and include an uppercase letter, a lowercase letter, a number, and a symbol!' });
+    }
+
     try {
         const user = await userModel.findOne({ email });
 
@@ -510,8 +524,13 @@ export const changePassword = async (req, res) => {
             return res.json({ success: false, message: 'Required fields missing' });
         }
 
-        if (newPassword.length < 6) {
-            return res.json({ success: false, message: 'Password must be at least 6 characters' });
+        if (newPassword.length < 8) {
+            return res.json({ success: false, message: 'Password must be at least 8 characters long' });
+        }
+
+        const strongPasswordRegexChange = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).+$/;
+        if (!strongPasswordRegexChange.test(newPassword)) {
+            return res.json({ success: false, message: 'Password must include an uppercase letter, a lowercase letter, a number, and a symbol!' });
         }
 
         const user = await userModel.findById(userId);

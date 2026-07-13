@@ -4,6 +4,88 @@ import inventoryModels from "../models/inventoryModels.js";
 
 const router = express.Router();
 
+// ── Helpers: compute a hospital's / organisation's own real stock ────────
+const getHospitalStock = async (hospitalId) => {
+    const inventory = await inventoryModels.find({
+        hospital: hospitalId,
+        status: { $ne: 'expired' },
+        expiryDate: { $gt: new Date() },
+        $or: [
+            { inventoryType: 'in' },
+            { inventoryType: 'out', organisation: null }
+        ]
+    });
+    const bloodGroups = ['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'];
+    const bloodStock = {};
+    bloodGroups.forEach(g => { bloodStock[g] = 0; });
+    inventory.forEach(item => {
+        if (item.inventoryType === 'in') bloodStock[item.bloodGroup] += item.quantity;
+        else if (item.inventoryType === 'out') bloodStock[item.bloodGroup] -= item.quantity;
+    });
+    Object.keys(bloodStock).forEach(g => { if (bloodStock[g] < 0) bloodStock[g] = 0; });
+    return bloodStock;
+};
+
+const getOrgStockForSearch = async (orgId) => {
+    const inventory = await inventoryModels.find({
+        organisation: orgId,
+        status: { $ne: 'expired' },
+        expiryDate: { $gt: new Date() },
+        $or: [
+            { inventoryType: 'out' },
+            { inventoryType: 'in', hospital: null }
+        ]
+    });
+    const bloodGroups = ['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'];
+    const bloodStock = {};
+    bloodGroups.forEach(g => { bloodStock[g] = 0; });
+    inventory.forEach(item => {
+        if (item.inventoryType === 'in') bloodStock[item.bloodGroup] += item.quantity;
+        else if (item.inventoryType === 'out') bloodStock[item.bloodGroup] -= item.quantity;
+    });
+    Object.keys(bloodStock).forEach(g => { if (bloodStock[g] < 0) bloodStock[g] = 0; });
+    return bloodStock;
+};
+
+// ── Helper: run a location query at a given precision, filtering by stock ──
+const findHospitalsAtLevel = async (baseQuery, locationFilter, bloodGroup, matchLevel) => {
+    const hospitals = await userModel.find({ ...baseQuery, ...locationFilter }).select('hospitalName email phone address');
+    const withStock = await Promise.all(hospitals.map(async (hospital) => {
+        const bloodStock = await getHospitalStock(hospital._id);
+        if (bloodGroup && bloodStock[bloodGroup] <= 0) return null;
+        return {
+            _id: hospital._id,
+            hospitalName: hospital.hospitalName,
+            email: hospital.email,
+            phone: hospital.phone,
+            address: hospital.address,
+            bloodStock,
+            totalUnits: Object.values(bloodStock).reduce((s, v) => s + v, 0),
+            matchLevel
+        };
+    }));
+    return withStock.filter(h => h !== null);
+};
+
+const findOrganisationsAtLevel = async (baseQuery, locationFilter, bloodGroup, matchLevel) => {
+    const orgs = await userModel.find({ ...baseQuery, ...locationFilter }).select('organisationName email phone address');
+    const withStock = await Promise.all(orgs.map(async (org) => {
+        const bloodStock = await getOrgStockForSearch(org._id);
+        if (bloodGroup && bloodStock[bloodGroup] <= 0) return null;
+        return {
+            _id: org._id,
+            organisationName: org.organisationName,
+            email: org.email,
+            phone: org.phone,
+            address: org.address,
+            bloodStock,
+            totalUnits: Object.values(bloodStock).reduce((s, v) => s + v, 0),
+            matchLevel
+        };
+    }));
+    return withStock.filter(o => o !== null);
+};
+
 router.post('/search', async (req, res) => {
     try {
         const { type, bloodGroup, state, district, city } = req.body;
@@ -22,156 +104,78 @@ router.post('/search', async (req, res) => {
         };
 
         if (type === 'donor') {
-            query.role = 'donor';
-            query.isAvailable = true;
+            const donorBaseQuery = { role: 'donor', approvalStatus: 'approved', isAccountVerified: true, isAvailable: true };
+            if (bloodGroup) donorBaseQuery.bloodtype = bloodGroup;
 
-            if (bloodGroup) query.bloodtype = bloodGroup;
+            const runDonorQuery = async (locationFilter, matchLevel) => {
+                const donors = await userModel
+                    .find({ ...donorBaseQuery, ...locationFilter })
+                    .select('name phone bloodtype address isAvailable');
+                return donors.map(d => ({ ...d.toObject(), matchLevel }));
+            };
 
-
-            if (state) query['address.state'] = state;
-            if (district) query['address.district'] = district;
-            if (city) query['address.city'] = city;
-
-            const donors = await userModel
-                .find(query)
-                .select('name phone bloodtype address isAvailable');
+            // Same city -> district -> state fallback as hospitals/organisations.
+            let donorResults = [];
+            if (city) donorResults = await runDonorQuery({ 'address.state': state, 'address.district': district, 'address.city': city }, 'city');
+            if (donorResults.length === 0 && district) donorResults = await runDonorQuery({ 'address.state': state, 'address.district': district }, 'district');
+            if (donorResults.length === 0 && state) donorResults = await runDonorQuery({ 'address.state': state }, 'state');
 
             return res.json({
                 success: true,
                 type: 'donor',
-                results: donors,
-                count: donors.length
+                results: donorResults,
+                count: donorResults.length,
+                matchLevel: donorResults[0]?.matchLevel || null
             });
 
         } else if (type === 'hospital') {
-            query.role = 'hospital';
+            const baseQuery = { role: 'hospital', approvalStatus: 'approved', isAccountVerified: true };
 
-            if (state) query['address.state'] = state;
-            if (district) query['address.district'] = district;
-            if (city) query['address.city'] = city;
-
-            const hospitals = await userModel
-                .find(query)
-                .select('hospitalName email phone address');
-
-
-            const hospitalsWithStock = await Promise.all(
-                hospitals.map(async (hospital) => {
-                    const inventory = await inventoryModels.find({
-                        hospital: hospital._id,
-                        status: { $ne: 'expired' },
-                        expiryDate: { $gt: new Date() },
-                        $or: [
-                            { inventoryType: 'in' },
-                            { inventoryType: 'out', source_type: { $in: ['hospital', 'patient', 'manual', null] } }
-                        ]
-                    });
-
-                    const bloodGroups = ['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'];
-                    const bloodStock = {};
-
-                    bloodGroups.forEach(group => {
-                        bloodStock[group] = 0;
-                    });
-
-                    inventory.forEach(item => {
-                        if (item.inventoryType === 'in') {
-                            bloodStock[item.bloodGroup] = (bloodStock[item.bloodGroup] || 0) + item.quantity;
-                        } else if (item.inventoryType === 'out') {
-                            bloodStock[item.bloodGroup] = (bloodStock[item.bloodGroup] || 0) - item.quantity;
-                        }
-                    });
-
-                    Object.keys(bloodStock).forEach(g => { if (bloodStock[g] < 0) bloodStock[g] = 0; });
-
-                    if (bloodGroup && bloodStock[bloodGroup] <= 0) {
-                        return null;
-                    }
-
-                    return {
-                        _id: hospital._id,
-                        hospitalName: hospital.hospitalName,
-                        email: hospital.email,
-                        phone: hospital.phone,
-                        address: hospital.address,
-                        bloodStock: bloodStock,
-                        totalUnits: Object.values(bloodStock).reduce((sum, val) => sum + val, 0)
-                    };
-                })
-            );
-
-            const filteredHospitals = hospitalsWithStock.filter(h => h !== null);
+            // Try exact city first; if nothing matches, widen to the whole
+            // district, then the whole state — so a real nearby hospital
+            // still turns up instead of an empty results page.
+            let filteredHospitals = [];
+            if (city) {
+                filteredHospitals = await findHospitalsAtLevel(baseQuery, { 'address.state': state, 'address.district': district, 'address.city': city }, bloodGroup, 'city');
+            }
+            if (filteredHospitals.length === 0 && district) {
+                filteredHospitals = await findHospitalsAtLevel(baseQuery, { 'address.state': state, 'address.district': district }, bloodGroup, 'district');
+            }
+            if (filteredHospitals.length === 0 && state) {
+                filteredHospitals = await findHospitalsAtLevel(baseQuery, { 'address.state': state }, bloodGroup, 'state');
+            }
 
             return res.json({
                 success: true,
                 type: 'hospital',
                 results: filteredHospitals,
-                count: filteredHospitals.length
+                count: filteredHospitals.length,
+                matchLevel: filteredHospitals[0]?.matchLevel || null
             });
 
         } else if (type === 'organisation') {
-            query.role = 'organisation';
+            const baseQuery = { role: 'organisation', approvalStatus: 'approved', isAccountVerified: true };
 
-            if (state) query['address.state'] = state;
-            if (district) query['address.district'] = district;
-            if (city) query['address.city'] = city;
-
-            const organisations = await userModel
-                .find(query)
-                .select('organisationName email phone address');
-
-            const organisationsWithStock = await Promise.all(
-                organisations.map(async (org) => {
-                    const inventory = await inventoryModels.find({
-                        organisation: org._id,
-                        status: { $ne: 'expired' },
-                        expiryDate: { $gt: new Date() },
-                        $or: [
-                            { inventoryType: 'out' },
-                            { inventoryType: 'in', target_type: { $ne: 'hospital' } }
-                        ]
-                    });
-
-                    const bloodGroups = ['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'];
-                    const bloodStock = {};
-
-                    bloodGroups.forEach(group => {
-                        bloodStock[group] = 0;
-                    });
-
-                    inventory.forEach(item => {
-                        if (item.inventoryType === 'in') {
-                            bloodStock[item.bloodGroup] = (bloodStock[item.bloodGroup] || 0) + item.quantity;
-                        } else if (item.inventoryType === 'out') {
-                            bloodStock[item.bloodGroup] = (bloodStock[item.bloodGroup] || 0) - item.quantity;
-                        }
-                    });
-
-                    Object.keys(bloodStock).forEach(g => { if (bloodStock[g] < 0) bloodStock[g] = 0; });
-
-                    if (bloodGroup && bloodStock[bloodGroup] <= 0) {
-                        return null;
-                    }
-
-                    return {
-                        _id: org._id,
-                        organisationName: org.organisationName,
-                        email: org.email,
-                        phone: org.phone,
-                        address: org.address,
-                        bloodStock: bloodStock,
-                        totalUnits: Object.values(bloodStock).reduce((sum, val) => sum + val, 0)
-                    };
-                })
-            );
-
-            const filteredOrganisations = organisationsWithStock.filter(o => o !== null);
+            // Same city -> district -> state fallback as hospitals, so a
+            // nearby organisation with the requested blood group still shows
+            // up instead of an empty page when the exact city has none.
+            let filteredOrganisations = [];
+            if (city) {
+                filteredOrganisations = await findOrganisationsAtLevel(baseQuery, { 'address.state': state, 'address.district': district, 'address.city': city }, bloodGroup, 'city');
+            }
+            if (filteredOrganisations.length === 0 && district) {
+                filteredOrganisations = await findOrganisationsAtLevel(baseQuery, { 'address.state': state, 'address.district': district }, bloodGroup, 'district');
+            }
+            if (filteredOrganisations.length === 0 && state) {
+                filteredOrganisations = await findOrganisationsAtLevel(baseQuery, { 'address.state': state }, bloodGroup, 'state');
+            }
 
             return res.json({
                 success: true,
                 type: 'organisation',
                 results: filteredOrganisations,
-                count: filteredOrganisations.length
+                count: filteredOrganisations.length,
+                matchLevel: filteredOrganisations[0]?.matchLevel || null
             });
 
         } else {
@@ -377,7 +381,7 @@ router.post('/check-org-stock', async (req, res) => {
             expiryDate: { $gt: new Date() },
             $or: [
                 { inventoryType: 'out' },
-                { inventoryType: 'in', target_type: { $ne: 'hospital' } }
+                { inventoryType: 'in', hospital: null }
             ]
         });
 

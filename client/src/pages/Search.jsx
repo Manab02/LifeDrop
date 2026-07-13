@@ -11,6 +11,7 @@ const Search = () => {
     const [loading, setLoading] = useState(false);
     const [searched, setSearched] = useState(false);
     const [searchType, setSearchType] = useState('');
+    const [matchLevel, setMatchLevel] = useState(null);
 
     useEffect(() => {
         const type = searchParams.get('type');
@@ -45,9 +46,11 @@ const Search = () => {
 
             if (data.success) {
                 setResults(data.results || []);
+                setMatchLevel(data.matchLevel || null);
             } else {
                 alert(data.message || 'Search failed');
                 setResults([]);
+                setMatchLevel(null);
             }
         } catch (error) {
             console.error('Search error:', error);
@@ -80,8 +83,15 @@ const Search = () => {
                         <p className="text-sm text-gray-500">{donor.address?.city}</p>
                     </div>
                 </div>
-                <div className="bg-red-600 text-white px-3 py-1 rounded-full font-bold text-sm">
-                    {donor.bloodtype}
+                <div className="flex flex-col items-end gap-1">
+                    <div className="bg-red-600 text-white px-3 py-1 rounded-full font-bold text-sm">
+                        {donor.bloodtype}
+                    </div>
+                    {donor.matchLevel && donor.matchLevel !== 'city' && (
+                        <span className="text-xs bg-blue-100 text-blue-700 font-semibold px-2 py-1 rounded-full whitespace-nowrap">
+                            Nearby ({donor.matchLevel})
+                        </span>
+                    )}
                 </div>
             </div>
 
@@ -120,6 +130,11 @@ const Search = () => {
                         <p className="text-sm text-gray-500">{hospital.address?.city}</p>
                     </div>
                 </div>
+                {hospital.matchLevel && hospital.matchLevel !== 'city' && (
+                    <span className="text-xs bg-blue-100 text-blue-700 font-semibold px-2 py-1 rounded-full whitespace-nowrap">
+                        Nearby ({hospital.matchLevel})
+                    </span>
+                )}
             </div>
 
             <div className="space-y-2 text-sm mb-4">
@@ -182,6 +197,11 @@ const Search = () => {
                         <p className="text-sm text-gray-500">{org.address?.city}</p>
                     </div>
                 </div>
+                {org.matchLevel && org.matchLevel !== 'city' && (
+                    <span className="text-xs bg-blue-100 text-blue-700 font-semibold px-2 py-1 rounded-full whitespace-nowrap">
+                        Nearby ({org.matchLevel})
+                    </span>
+                )}
             </div>
 
             <div className="space-y-2 text-sm mb-4">
@@ -260,6 +280,19 @@ const Search = () => {
                                     {results.length} Result{results.length !== 1 ? 's' : ''} Found
                                 </h3>
                             </div>
+
+                            {matchLevel === 'district' && (
+                                <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4 text-blue-800 text-sm flex items-center gap-2">
+                                    <MapPin className="w-5 h-5 flex-shrink-0" />
+                                    No exact match in your city — showing nearby results from across the district instead.
+                                </div>
+                            )}
+                            {matchLevel === 'state' && (
+                                <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4 text-blue-800 text-sm flex items-center gap-2">
+                                    <MapPin className="w-5 h-5 flex-shrink-0" />
+                                    No exact match nearby — showing results from across the state instead.
+                                </div>
+                            )}
 
                             {results.length === 0 ? (
                                 <div className="bg-white rounded-lg shadow p-12 text-center">

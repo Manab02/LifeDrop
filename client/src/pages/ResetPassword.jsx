@@ -71,8 +71,14 @@ const ResetPassword = () => {
             return;
         }
 
-        if (newPassword.length < 6) {
-            alert('Password must be at least 6 characters long');
+        if (newPassword.length < 8) {
+            alert('Password must be at least 8 characters long');
+            return;
+        }
+
+        const strongPasswordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).+$/;
+        if (!strongPasswordRegex.test(newPassword)) {
+            alert('Password must include an uppercase letter, a lowercase letter, a number, and a symbol!');
             return;
         }
 
@@ -145,8 +151,8 @@ const ResetPassword = () => {
                             <label
                                 htmlFor="email"
                                 className={`absolute left-0 text-sm transition-all pointer-events-none ${emailFocused || email
-                                        ? '-top-4 text-xs text-red-600'
-                                        : 'top-2 text-gray-400 text-base'
+                                    ? '-top-4 text-xs text-red-600'
+                                    : 'top-2 text-gray-400 text-base'
                                     }`}
                             >
                                 Email Address
@@ -210,8 +216,8 @@ const ResetPassword = () => {
                             <label
                                 htmlFor="newPassword"
                                 className={`absolute left-0 text-sm transition-all pointer-events-none ${passwordFocused || newPassword
-                                        ? '-top-4 text-xs text-red-600'
-                                        : 'top-2 text-gray-400 text-base'
+                                    ? '-top-4 text-xs text-red-600'
+                                    : 'top-2 text-gray-400 text-base'
                                     }`}
                             >
                                 New Password
@@ -240,8 +246,8 @@ const ResetPassword = () => {
                             <label
                                 htmlFor="confirmPassword"
                                 className={`absolute left-0 text-sm transition-all pointer-events-none ${confirmPasswordFocused || confirmPassword
-                                        ? '-top-4 text-xs text-red-600'
-                                        : 'top-2 text-gray-400 text-base'
+                                    ? '-top-4 text-xs text-red-600'
+                                    : 'top-2 text-gray-400 text-base'
                                     }`}
                             >
                                 Confirm New Password

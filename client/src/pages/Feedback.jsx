@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-//import { API_URL } from '../services/api';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:7000';
 

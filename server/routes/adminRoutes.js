@@ -1269,14 +1269,27 @@ router.get('/blood-group-details/:group', userAuth, isAdmin, async (req, res) =>
             .populate('organisation', 'organisationName')
             .populate('hospital', 'hospitalName');
 
-        // Build net per entity
+        // Build net per entity — attribute each record to its TRUE owner.
+        // A transfer record has BOTH organisation and hospital set, so we can't
+        // just pick "organisation || hospital" (that always favors org and hides
+        // the hospital's own side entirely). Ownership depends on direction:
+        //   - IN record referencing a hospital  → belongs to that hospital (they gained stock)
+        //   - OUT record referencing an org      → belongs to that org (they lost stock)
+        //   - IN record referencing only an org  → belongs to that org (donor donation)
+        //   - OUT record referencing only a hosp → belongs to that hospital (they used stock)
         const entityMap = {};
         inventory.forEach(item => {
-            const entity = item.organisation || item.hospital;
+            let entity = null, type = null;
+            if (item.inventoryType === 'in') {
+                if (item.hospital) { entity = item.hospital; type = 'hospital'; }
+                else if (item.organisation) { entity = item.organisation; type = 'organisation'; }
+            } else {
+                if (item.organisation) { entity = item.organisation; type = 'organisation'; }
+                else if (item.hospital) { entity = item.hospital; type = 'hospital'; }
+            }
             if (!entity) return;
             const id = entity._id.toString();
             const name = entity.organisationName || entity.hospitalName || 'Unknown';
-            const type = item.organisation ? 'organisation' : 'hospital';
             if (!entityMap[id]) entityMap[id] = { name, type, net: 0 };
             entityMap[id].net += item.inventoryType === 'in' ? item.quantity : -item.quantity;
         });

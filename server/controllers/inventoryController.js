@@ -302,7 +302,7 @@ export const getInventoryController = async (req, res) => {
                 organisation: req.body.userId,
                 $or: [
                     { inventoryType: 'out' },
-                    { inventoryType: 'in', target_type: { $ne: 'hospital' } }
+                    { inventoryType: 'in', hospital: null }
                 ]
             };
         } else if (user.role === 'hospital') {
@@ -311,7 +311,7 @@ export const getInventoryController = async (req, res) => {
                 hospital: req.body.userId,
                 $or: [
                     { inventoryType: 'in' },
-                    { inventoryType: 'out', source_type: { $in: ['hospital', 'patient', 'manual', null] } }
+                    { inventoryType: 'out', organisation: null }
                 ]
             };
         } else if (user.role === 'donor') {
@@ -377,7 +377,7 @@ export const decreaseInventory = async (req, res) => {
             expiryDate: { $gt: new Date() },
             $or: [
                 { inventoryType: 'in' },
-                { inventoryType: 'out', source_type: { $in: ['hospital', 'patient', 'manual', null] } }
+                { inventoryType: 'out', organisation: null }
             ]
         }).sort({ expiryDate: 1 });
 
@@ -458,7 +458,7 @@ export const getBloodStock = async (req, res) => {
                 organisation: req.body.userId,
                 $or: [
                     { inventoryType: 'out' },
-                    { inventoryType: 'in', target_type: { $ne: 'hospital' } }
+                    { inventoryType: 'in', hospital: null }
                 ]
             };
         } else if (user.role === 'hospital') {
@@ -466,7 +466,7 @@ export const getBloodStock = async (req, res) => {
                 hospital: req.body.userId,
                 $or: [
                     { inventoryType: 'in' },
-                    { inventoryType: 'out', source_type: { $in: ['hospital', 'patient', 'manual', null] } }
+                    { inventoryType: 'out', organisation: null }
                 ]
             };
         } else {
@@ -542,7 +542,7 @@ export const getInventoryStats = async (req, res) => {
                 organisation: req.body.userId,
                 $or: [
                     { inventoryType: 'out' },
-                    { inventoryType: 'in', target_type: { $ne: 'hospital' } }
+                    { inventoryType: 'in', hospital: null }
                 ]
             };
         } else if (user.role === 'hospital') {
@@ -550,7 +550,7 @@ export const getInventoryStats = async (req, res) => {
                 hospital: req.body.userId,
                 $or: [
                     { inventoryType: 'in' },
-                    { inventoryType: 'out', source_type: { $in: ['hospital', 'patient', 'manual', null] } }
+                    { inventoryType: 'out', organisation: null }
                 ]
             };
         } else if (user.role === 'donor') {

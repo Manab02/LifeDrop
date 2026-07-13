@@ -20,6 +20,8 @@ export default function OrganisationDashboard() {
     // Data
     const [inventory, setInventory] = useState([]);
     const [bloodStock, setBloodStock] = useState({});
+    const [bloodStockDetails, setBloodStockDetails] = useState({});
+    const [selectedStockGroup, setSelectedStockGroup] = useState(null);
     const [donors, setDonors] = useState([]);
     const [camps, setCamps] = useState([]);
     const [campNotifications, setCampNotifications] = useState([]);
@@ -43,7 +45,7 @@ export default function OrganisationDashboard() {
     // Transfer
     const [showTransferModal, setShowTransferModal] = useState(false);
     const [showWalkinModal, setShowWalkinModal] = useState(false);
-    const [walkinForm, setWalkinForm] = useState({ donorName: '', campName: '', bloodGroup: '', quantity: '', expiryDate: '' });
+    const [walkinForm, setWalkinForm] = useState({ donorName: '', donorPhone: '', campName: '', bloodGroup: '', quantity: '', expiryDate: '' });
     const [walkinSaving, setWalkinSaving] = useState(false);
     const [transfers, setTransfers] = useState([]);
     const [hospitals, setHospitals] = useState([]);
@@ -94,6 +96,7 @@ export default function OrganisationDashboard() {
             if (data.success && data.inventory) {
                 setInventory(data.inventory);
                 calcBloodStock(data.inventory);
+                calcBloodStockDetails(data.inventory);
                 calcStats(data.inventory);
                 buildNotifications(data.inventory);
             }
@@ -183,6 +186,51 @@ export default function OrganisationDashboard() {
         setBloodStock(stock);
     };
 
+    // Detailed per-group breakdown (total/expiring/items), same shape as the
+    // Hospital dashboard, so clicking a blood group shows exactly what's in
+    // stock and what's expiring soon — with expiring capped to real net
+    // stock so a fully-used batch doesn't keep showing as "expiring".
+    const calcBloodStockDetails = (inv) => {
+        const details = {};
+        BLOOD_GROUPS.forEach(g => { details[g] = { total: 0, expiring: 0, items: [] }; });
+
+        const now = new Date();
+        const fiveDaysFromNow = new Date(now.getTime() + (5 * 24 * 60 * 60 * 1000));
+
+        inv.forEach(item => {
+            const itemExpiry = new Date(item.expiryDate);
+            const isExpired = item.status === 'expired' || itemExpiry < now;
+            const isExpiringSoon = !isExpired && itemExpiry <= fiveDaysFromNow;
+
+            if (!isExpired) {
+                const quantity = item.inventoryType === 'in' ? item.quantity : -item.quantity;
+                details[item.bloodGroup].total += quantity;
+
+                if (isExpiringSoon && item.inventoryType === 'in') {
+                    details[item.bloodGroup].expiring += item.quantity;
+                }
+
+                details[item.bloodGroup].items.push({
+                    id: item._id,
+                    quantity: item.quantity,
+                    type: item.inventoryType,
+                    expiryDate: item.expiryDate,
+                    isExpiringSoon: isExpiringSoon && item.inventoryType === 'in',
+                    createdAt: item.createdAt,
+                    status: item.status
+                });
+            }
+        });
+
+        Object.keys(details).forEach(group => {
+            if (details[group].total < 0) details[group].total = 0;
+            // Can't have more units "expiring soon" than are actually still in stock
+            if (details[group].expiring > details[group].total) details[group].expiring = details[group].total;
+        });
+
+        setBloodStockDetails(details);
+    };
+
     const calcStats = (inv) => {
         const donors = new Set();
         const hospitals = new Set();
@@ -229,11 +277,12 @@ export default function OrganisationDashboard() {
                 notifs.push({ id: `low-${g}`, type: 'warning', icon: 'info-circle', message: `${g} is low: ${qty} units remaining`, time: 'Now' });
             }
         });
-        // expiring soon
+        // expiring soon — only if this blood group still has net stock; a
+        // batch that's already been fully used (OUT) isn't "expiring", it's gone.
         inv.forEach(item => {
             const expiry = new Date(item.expiryDate);
             const days = Math.ceil((expiry - now) / 86400000);
-            if (days > 0 && days <= 5 && item.inventoryType === 'in' && item.status !== 'expired') {
+            if (days > 0 && days <= 5 && item.inventoryType === 'in' && item.status !== 'expired' && (stock[item.bloodGroup] || 0) > 0) {
                 notifs.push({ id: `exp-${item._id}`, type: 'warning', icon: 'clock', message: `${item.bloodGroup} — ${item.quantity} units expire in ${days} day(s)`, time: expiry.toLocaleDateString() });
             }
         });
@@ -366,8 +415,12 @@ export default function OrganisationDashboard() {
             setPasswordMessage('New passwords do not match');
             return;
         }
-        if (passwordForm.newPassword.length < 6) {
-            setPasswordMessage('New password must be at least 6 characters');
+        if (passwordForm.newPassword.length < 8) {
+            setPasswordMessage('New password must be at least 8 characters');
+            return;
+        }
+        if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).+$/.test(passwordForm.newPassword)) {
+            setPasswordMessage('Password must include an uppercase letter, a lowercase letter, a number, and a symbol');
             return;
         }
         setPasswordSaving(true);
@@ -416,6 +469,7 @@ export default function OrganisationDashboard() {
     // ── Sidebar nav items ─────────────────────────────────────────
     const navItems = [
         { id: 'dashboard', icon: 'fa-gauge', label: 'Dashboard' },
+        { id: 'stock', icon: 'fa-flask', label: 'Blood Stock' },
         { id: 'camps', icon: 'fa-calendar-plus', label: 'Upcoming Camps', badge: campNotifications.length || null },
         { id: 'donors', icon: 'fa-users', label: 'Donor List' },
         { id: 'records', icon: 'fa-hand-holding-heart', label: 'Donation Records' },
@@ -605,6 +659,105 @@ export default function OrganisationDashboard() {
                                 </table>
                             </div>
                         </>
+                    )}
+
+                    {/* ── BLOOD STOCK TAB (with expiry) ────────────── */}
+                    {activeTab === 'stock' && (
+                        <div>
+                            <div className="flex items-center justify-between mb-4">
+                                <h2 className="text-xl font-bold text-gray-800">Blood Stock (Real-time)</h2>
+                            </div>
+
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                                {BLOOD_GROUPS.map(group => {
+                                    const data = bloodStockDetails[group] || { total: 0, expiring: 0, items: [] };
+                                    const status = stockStatus(data.total);
+                                    return (
+                                        <button
+                                            key={group}
+                                            onClick={() => setSelectedStockGroup(group)}
+                                            className={`text-left bg-white rounded-xl shadow p-4 hover:shadow-md transition border-2 ${data.total === 0 ? 'border-red-400' : data.total < 10 ? 'border-orange-300' : 'border-transparent'}`}
+                                        >
+                                            <div className="flex items-center justify-between mb-2">
+                                                <span className="text-xl font-bold text-red-600">{group}</span>
+                                                {data.expiring > 0 && (
+                                                    <span className="text-xs bg-orange-100 text-orange-700 font-semibold px-2 py-0.5 rounded-full">
+                                                        {data.expiring} expiring
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <div className="text-2xl font-bold text-gray-800">{data.total}</div>
+                                            <div className="text-xs text-gray-500 mb-1">units</div>
+                                            <span className={`text-xs font-semibold px-1.5 py-0.5 rounded ${status.cls}`}>{status.text}</span>
+                                            <p className="text-xs text-gray-400 mt-2">Click for details ({data.items.length} record{data.items.length !== 1 ? 's' : ''})</p>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+
+                            {/* Per-group breakdown modal */}
+                            {selectedStockGroup && (() => {
+                                const data = bloodStockDetails[selectedStockGroup] || { total: 0, expiring: 0, items: [] };
+                                const status = stockStatus(data.total);
+                                return (
+                                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setSelectedStockGroup(null)}>
+                                        <div className="bg-white rounded-xl w-full max-w-lg max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
+                                            <div className="bg-red-600 text-white px-6 py-4 rounded-t-xl flex items-center justify-between">
+                                                <h2 className="font-bold text-lg">{selectedStockGroup} — Stock Details</h2>
+                                                <button onClick={() => setSelectedStockGroup(null)} className="hover:opacity-70">
+                                                    <i className="fa fa-times text-xl"></i>
+                                                </button>
+                                            </div>
+                                            <div className="p-6 border-b">
+                                                <div className="flex items-center justify-between">
+                                                    <div>
+                                                        <div className="text-3xl font-bold text-gray-800">{data.total} units</div>
+                                                        <span className={`text-sm font-semibold px-1.5 py-0.5 rounded ${status.cls}`}>{status.text}</span>
+                                                    </div>
+                                                    {data.expiring > 0 && (
+                                                        <div className="bg-orange-100 px-4 py-2 rounded-lg">
+                                                            <p className="text-sm font-semibold text-orange-700">⚠️ {data.expiring} units expiring soon</p>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <div className="overflow-y-auto p-6">
+                                                {data.items.length === 0 ? (
+                                                    <p className="text-center text-gray-400 py-8">No records for this group</p>
+                                                ) : (
+                                                    <div className="space-y-2">
+                                                        {data.items.map((item) => (
+                                                            <div key={item.id} className={`flex items-center justify-between p-3 rounded-lg ${item.isExpiringSoon ? 'bg-orange-50 border border-orange-200' : 'bg-gray-50'}`}>
+                                                                <div className="flex items-center gap-3">
+                                                                    <span className={`px-2 py-1 rounded text-xs font-semibold ${item.type === 'in' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                                                        {item.type === 'in' ? 'IN' : 'OUT'}
+                                                                    </span>
+                                                                    <span className="font-semibold">{item.quantity} units</span>
+                                                                </div>
+                                                                <div className="text-right">
+                                                                    {item.type === 'in' ? (
+                                                                        <p className={`text-sm font-semibold ${item.isExpiringSoon ? 'text-orange-600' : 'text-gray-600'}`}>
+                                                                            Expires: {new Date(item.expiryDate).toLocaleDateString()}
+                                                                        </p>
+                                                                    ) : (
+                                                                        <p className="text-sm font-semibold text-gray-600">
+                                                                            Used / Sent
+                                                                        </p>
+                                                                    )}
+                                                                    <p className="text-xs text-gray-500">
+                                                                        {item.type === 'in' ? 'Added' : 'Date'}: {new Date(item.createdAt).toLocaleDateString()}
+                                                                    </p>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })()}
+                        </div>
                     )}
 
                     {/* ── CAMPS TAB ─────────────────────────────────── */}
@@ -1019,7 +1172,7 @@ export default function OrganisationDashboard() {
                                                 value={passwordForm.newPassword}
                                                 onChange={handlePasswordChange}
                                                 required
-                                                minLength={6}
+                                                minLength={8}
                                                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none"
                                             />
                                         </div>
@@ -1031,7 +1184,7 @@ export default function OrganisationDashboard() {
                                                 value={passwordForm.confirmNewPassword}
                                                 onChange={handlePasswordChange}
                                                 required
-                                                minLength={6}
+                                                minLength={8}
                                                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none"
                                             />
                                         </div>
@@ -1125,6 +1278,15 @@ export default function OrganisationDashboard() {
                                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 outline-none" />
                             </div>
                             <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-1">Mobile Number</label>
+                                <input value={walkinForm.donorPhone}
+                                    onChange={e => setWalkinForm({ ...walkinForm, donorPhone: e.target.value.replace(/\D/g, '').slice(0, 10) })}
+                                    placeholder="10-digit mobile number"
+                                    inputMode="numeric"
+                                    maxLength={10}
+                                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 outline-none" />
+                            </div>
+                            <div>
                                 <label className="block text-sm font-semibold text-gray-700 mb-1">Camp / Source Name</label>
                                 <input value={walkinForm.campName} onChange={e => setWalkinForm({ ...walkinForm, campName: e.target.value })}
                                     placeholder="e.g. City Hall Blood Camp, Walk-in..."
@@ -1157,8 +1319,14 @@ export default function OrganisationDashboard() {
                                     if (!walkinForm.donorName || !walkinForm.bloodGroup || !walkinForm.quantity || !walkinForm.expiryDate) {
                                         alert('Please fill all required fields'); return;
                                     }
+                                    if (walkinForm.donorPhone && walkinForm.donorPhone.length !== 10) {
+                                        alert('Mobile number must be exactly 10 digits'); return;
+                                    }
                                     setWalkinSaving(true);
                                     try {
+                                        const noteParts = [];
+                                        if (walkinForm.campName) noteParts.push(walkinForm.campName);
+                                        if (walkinForm.donorPhone) noteParts.push(`Phone: ${walkinForm.donorPhone}`);
                                         const res = await fetch(`${API_URL}/api/inventory/create-inventory`, {
                                             method: 'POST', credentials: 'include',
                                             headers: { 'Content-Type': 'application/json' },
@@ -1169,7 +1337,7 @@ export default function OrganisationDashboard() {
                                                 expiryDate: walkinForm.expiryDate,
                                                 organisation: user?.email,
                                                 source_name: walkinForm.donorName,
-                                                notes: walkinForm.campName || 'Walk-in donation',
+                                                notes: noteParts.length ? noteParts.join(' — ') : 'Walk-in donation',
                                                 isManualEntry: false,
                                                 verified: false,
                                                 walkinDonor: true
@@ -1179,7 +1347,7 @@ export default function OrganisationDashboard() {
                                         if (data.success) {
                                             alert('✅ Walk-in donation recorded! Added to your blood stock.');
                                             setShowWalkinModal(false);
-                                            setWalkinForm({ donorName: '', campName: '', bloodGroup: '', quantity: '', expiryDate: '' });
+                                            setWalkinForm({ donorName: '', donorPhone: '', campName: '', bloodGroup: '', quantity: '', expiryDate: '' });
                                             fetchAll();
                                         } else alert(data.message || 'Failed');
                                     } catch (_) { alert('Error occurred'); }

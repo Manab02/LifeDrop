@@ -636,55 +636,58 @@ const AdminDashboard = () => {
             )}
 
             {/* Pending Blood Transfers — Admin steps in */}
-            {activeTab === 'pending' && (
-              <div className="bg-white rounded-xl shadow-lg p-6">
-                <h2 className="text-2xl font-bold text-gray-800 mb-2 flex items-center gap-2">
-                  <Clock className="w-6 h-6 text-blue-600" />
-                  Pending Blood Transfers
-                  {pendingTransfers.length > 0 && <span className="ml-2 bg-red-100 text-red-700 text-sm px-2 py-0.5 rounded-full font-semibold">{pendingTransfers.length}</span>}
-                </h2>
-                <p className="text-sm text-gray-500 mb-5">
-                  These are organisation → hospital transfers awaiting action. Admin can approve or reject when org/hospital cannot act.
-                </p>
-                {pendingTransfers.length === 0 ? (
-                  <div className="bg-gray-50 rounded-lg p-12 text-center text-gray-500">
-                    <i className="fa fa-check-circle text-5xl text-green-300 mb-3 block"></i>
-                    <p className="font-semibold">No pending transfers</p>
-                    <p className="text-sm">All transfers have been processed</p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {pendingTransfers.map(t => (
-                      <div key={t._id} className="bg-white rounded-lg border border-gray-200 shadow-sm p-5">
-                        <div className="flex items-start justify-between gap-4">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-2 flex-wrap">
-                              <span className="text-xs font-bold bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full">{t.status.replace(/_/g, ' ').toUpperCase()}</span>
-                              <span className="text-xs text-gray-500 font-mono">{t.transferId}</span>
+            {activeTab === 'pending' && (() => {
+              const trulyPending = pendingTransfers.filter(t => t.status === 'requested');
+              return (
+                <div className="bg-white rounded-xl shadow-lg p-6">
+                  <h2 className="text-2xl font-bold text-gray-800 mb-2 flex items-center gap-2">
+                    <Clock className="w-6 h-6 text-blue-600" />
+                    Pending Blood Transfers
+                    {trulyPending.length > 0 && <span className="ml-2 bg-red-100 text-red-700 text-sm px-2 py-0.5 rounded-full font-semibold">{trulyPending.length}</span>}
+                  </h2>
+                  <p className="text-sm text-gray-500 mb-5">
+                    These are organisation → hospital transfers awaiting action. Admin can approve or reject when org/hospital cannot act.
+                  </p>
+                  {trulyPending.length === 0 ? (
+                    <div className="bg-gray-50 rounded-lg p-12 text-center text-gray-500">
+                      <i className="fa fa-check-circle text-5xl text-green-300 mb-3 block"></i>
+                      <p className="font-semibold">No pending transfers</p>
+                      <p className="text-sm">All transfers have been processed</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {trulyPending.map(t => (
+                        <div key={t._id} className="bg-white rounded-lg border border-gray-200 shadow-sm p-5">
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-2 flex-wrap">
+                                <span className="text-xs font-bold bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full">{t.status.replace(/_/g, ' ').toUpperCase()}</span>
+                                <span className="text-xs text-gray-500 font-mono">{t.transferId}</span>
+                              </div>
+                              <p className="text-sm font-semibold text-gray-800">Organisation: <span className="text-purple-700">{t.organisation?.organisationName}</span></p>
+                              <p className="text-sm font-semibold text-gray-800">Hospital: <span className="text-blue-700">{t.hospital?.hospitalName}</span></p>
+                              <div className="flex flex-wrap gap-2 mt-2">
+                                {t.items.map((item, idx) => (
+                                  <span key={idx} className="bg-red-50 border border-red-200 text-red-700 text-xs px-2 py-1 rounded font-semibold">
+                                    {item.bloodGroup}: {item.quantity} units
+                                  </span>
+                                ))}
+                              </div>
+                              {t.notes && <p className="text-xs text-gray-500 mt-1">Notes: {t.notes}</p>}
+                              <p className="text-xs text-gray-400 mt-1">{new Date(t.createdAt).toLocaleString()}</p>
                             </div>
-                            <p className="text-sm font-semibold text-gray-800">Organisation: <span className="text-purple-700">{t.organisation?.organisationName}</span></p>
-                            <p className="text-sm font-semibold text-gray-800">Hospital: <span className="text-blue-700">{t.hospital?.hospitalName}</span></p>
-                            <div className="flex flex-wrap gap-2 mt-2">
-                              {t.items.map((item, idx) => (
-                                <span key={idx} className="bg-red-50 border border-red-200 text-red-700 text-xs px-2 py-1 rounded font-semibold">
-                                  {item.bloodGroup}: {item.quantity} units
-                                </span>
-                              ))}
+                            <div className="flex flex-col gap-2 flex-shrink-0">
+                              <button onClick={() => handleAdminApproveTransfer(t._id)} className="px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 text-xs font-semibold">✅ Approve</button>
+                              <button onClick={() => setRejectTransferId(t._id)} className="px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 text-xs font-semibold">❌ Reject</button>
                             </div>
-                            {t.notes && <p className="text-xs text-gray-500 mt-1">Notes: {t.notes}</p>}
-                            <p className="text-xs text-gray-400 mt-1">{new Date(t.createdAt).toLocaleString()}</p>
-                          </div>
-                          <div className="flex flex-col gap-2 flex-shrink-0">
-                            <button onClick={() => handleAdminApproveTransfer(t._id)} className="px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 text-xs font-semibold">✅ Approve</button>
-                            <button onClick={() => setRejectTransferId(t._id)} className="px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 text-xs font-semibold">❌ Reject</button>
                           </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             {/*  Expiry Warnings Tab */}
             {activeTab === 'expiry' && (
@@ -846,12 +849,12 @@ const AdminDashboard = () => {
                       const getTxCount = (e) => inventory.filter(item => {
                         if (inventorySubTab === 'hospitals') {
                           if (item.hospital?._id !== e._id) return false;
-                          if (item.inventoryType === 'out') return ['hospital', 'patient', 'manual', null, undefined].includes(item.source_type);
+                          if (item.inventoryType === 'out') return !item.organisation;
                           return true;
                         }
                         if (inventorySubTab === 'organisations') {
                           if (item.organisation?._id !== e._id) return false;
-                          if (item.inventoryType === 'in') return item.target_type !== 'hospital';
+                          if (item.inventoryType === 'in') return !item.hospital;
                           return true;
                         }
                         return item.donor?._id === e._id;
@@ -966,13 +969,13 @@ const AdminDashboard = () => {
                         if (selectedInvEntity.type === 'hospitals') {
                           if (item.hospital?._id !== selectedInvEntity.id) return false;
                           // Exclude the org's own OUT record that just references this hospital
-                          if (item.inventoryType === 'out') return ['hospital', 'patient', 'manual', null, undefined].includes(item.source_type);
+                          if (item.inventoryType === 'out') return !item.organisation;
                           return true;
                         }
                         if (selectedInvEntity.type === 'organisations') {
                           if (item.organisation?._id !== selectedInvEntity.id) return false;
                           // Exclude the hospital's own IN record that just references this org
-                          if (item.inventoryType === 'in') return item.target_type !== 'hospital';
+                          if (item.inventoryType === 'in') return !item.hospital;
                           return true;
                         }
                         return item.donor?._id === selectedInvEntity.id;
@@ -1020,10 +1023,11 @@ const AdminDashboard = () => {
                                 if (selectedInvEntity.type === 'donors') {
                                   counterparty = item.hospital?.hospitalName || item.organisation?.organisationName || item.target_name || 'N/A';
                                 } else if (selectedInvEntity.type === 'hospitals') {
-                                  counterparty = item.donor?.name || item.organisation?.organisationName || item.source_name || item.patientName || 'N/A';
+                                  counterparty = item.donor?.name || item.organisation?.organisationName || item.source_name || item.patientName || item.target_name || 'N/A';
                                 } else {
                                   counterparty = item.donor?.name || item.hospital?.hospitalName || item.source_name || item.target_name || 'N/A';
                                 }
+                                if (counterparty === 'N/A' && item.notes) counterparty = 'Manual / Other';
 
                                 return (
                                   <tr key={item._id} className={`${idx % 2 === 0 ? 'bg-gray-50' : ''} ${isExpired ? 'opacity-60' : ''}`}>
@@ -1035,7 +1039,12 @@ const AdminDashboard = () => {
                                     </td>
                                     <td className="p-3 font-bold text-red-600">{item.bloodGroup}</td>
                                     <td className="p-3">{item.quantity}</td>
-                                    <td className="p-3 text-sm">{counterparty}</td>
+                                    <td className="p-3 text-sm max-w-xs">
+                                      {counterparty}
+                                      {item.notes && (
+                                        <div className="text-xs text-gray-400 italic truncate">"{item.notes}"</div>
+                                      )}
+                                    </td>
                                     <td className="p-3">
                                       <span className={isExpired ? 'text-red-600 font-bold text-xs' : isExpiringSoon ? 'text-orange-600 font-semibold text-xs' : 'text-gray-600 text-xs'}>
                                         {new Date(item.expiryDate).toLocaleDateString()}

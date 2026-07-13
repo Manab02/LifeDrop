@@ -52,6 +52,10 @@ const HospitalDashboard = () => {
     const [manualAddNotes, setManualAddNotes] = useState('');
     const [manualAddSourceTransferId, setManualAddSourceTransferId] = useState(null);
     const [manualAddSaving, setManualAddSaving] = useState(false);
+    const [selectedStockGroup, setSelectedStockGroup] = useState(null);
+    const [showWalkinModal, setShowWalkinModal] = useState(false);
+    const [walkinForm, setWalkinForm] = useState({ donorName: '', donorPhone: '', campName: '', bloodGroup: '', quantity: '', expiryDate: '' });
+    const [walkinSaving, setWalkinSaving] = useState(false);
     const [recordsSubTab, setRecordsSubTab] = useState('in'); // 'in' | 'out'
     const [transfersSubTab, setTransfersSubTab] = useState('pending'); // 'pending' | 'history'
 
@@ -175,7 +179,7 @@ const HospitalDashboard = () => {
                     quantity: item.quantity,
                     type: item.inventoryType,
                     expiryDate: item.expiryDate,
-                    isExpiringSoon: isExpiringSoon,
+                    isExpiringSoon: isExpiringSoon && item.inventoryType === 'in',
                     createdAt: item.createdAt,
                     status: item.status
                 });
@@ -185,6 +189,12 @@ const HospitalDashboard = () => {
         Object.keys(stock).forEach(group => {
             if (stock[group].total < 0) {
                 stock[group].total = 0;
+            }
+            // Can't have more units "expiring soon" than are actually still in stock —
+            // if the batch that was expiring has since been used up (OUT), it's gone,
+            // not "about to expire".
+            if (stock[group].expiring > stock[group].total) {
+                stock[group].expiring = stock[group].total;
             }
         });
 
@@ -214,12 +224,29 @@ const HospitalDashboard = () => {
 
         totalUnits = Math.max(0, totalUnits);
 
-        const expiringCount = inventoryData.filter(item => {
+        // Compute net stock per blood group locally (don't rely on the
+        // `bloodStock` state var here — it may not have re-rendered yet).
+        const netByGroup = {};
+        const expiringByGroup = {};
+        inventoryData.forEach(item => {
             const now = new Date();
             const expiry = new Date(item.expiryDate);
+            const isExpired = item.status === 'expired' || expiry < now;
+            if (isExpired) return;
+            netByGroup[item.bloodGroup] = (netByGroup[item.bloodGroup] || 0) + (item.inventoryType === 'in' ? item.quantity : -item.quantity);
             const fiveDays = new Date(now.getTime() + (5 * 24 * 60 * 60 * 1000));
-            return expiry > now && expiry <= fiveDays && item.inventoryType === 'in' && item.status !== 'expired';
-        }).length;
+            if (item.inventoryType === 'in' && expiry <= fiveDays) {
+                expiringByGroup[item.bloodGroup] = (expiringByGroup[item.bloodGroup] || 0) + item.quantity;
+            }
+        });
+
+        // A group can't have more units "expiring soon" than it actually has in stock —
+        // once used (OUT), that blood is gone, not "about to expire".
+        let expiringCount = 0;
+        Object.keys(expiringByGroup).forEach(group => {
+            const net = Math.max(0, netByGroup[group] || 0);
+            expiringCount += Math.min(expiringByGroup[group], net);
+        });
 
         const lowStockGroups = Object.values(bloodStock).filter(stock =>
             stock.total > 0 && stock.total < 20
@@ -277,12 +304,20 @@ const HospitalDashboard = () => {
             }
         });
 
-        // Check expiring blood
+        // Check expiring blood — but only if that blood group actually still
+        // has net stock; a batch that's already been fully used (OUT) isn't
+        // "about to expire", it's gone.
+        const netStockByGroup = {};
+        inventoryData.forEach(item => {
+            if (item.status === 'expired' || new Date(item.expiryDate) < now) return;
+            netStockByGroup[item.bloodGroup] = (netStockByGroup[item.bloodGroup] || 0) + (item.inventoryType === 'in' ? item.quantity : -item.quantity);
+        });
+
         inventoryData.forEach(item => {
             const expiry = new Date(item.expiryDate);
             const daysDiff = Math.ceil((expiry - now) / (1000 * 60 * 60 * 24));
 
-            if (daysDiff > 0 && daysDiff <= 5 && item.inventoryType === 'in' && item.status !== 'expired') {
+            if (daysDiff > 0 && daysDiff <= 5 && item.inventoryType === 'in' && item.status !== 'expired' && (netStockByGroup[item.bloodGroup] || 0) > 0) {
                 notifs.push({
                     id: `expiry-${item._id}`,
                     type: 'warning',
@@ -570,8 +605,12 @@ const HospitalDashboard = () => {
             setPasswordMessage('New passwords do not match');
             return;
         }
-        if (passwordForm.newPassword.length < 6) {
-            setPasswordMessage('New password must be at least 6 characters');
+        if (passwordForm.newPassword.length < 8) {
+            setPasswordMessage('New password must be at least 8 characters');
+            return;
+        }
+        if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).+$/.test(passwordForm.newPassword)) {
+            setPasswordMessage('Password must include an uppercase letter, a lowercase letter, a number, and a symbol');
             return;
         }
         setPasswordSaving(true);
@@ -799,6 +838,13 @@ const HospitalDashboard = () => {
                                         <i className="fa fa-minus-circle"></i>
                                         Record Usage
                                     </button>
+                                    <button
+                                        onClick={() => setShowWalkinModal(true)}
+                                        className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 flex items-center gap-2 shadow-md hover:shadow-lg transition"
+                                    >
+                                        <i className="fa fa-user-plus"></i>
+                                        Walk-in Donation
+                                    </button>
                                 </div>
                             </div>
 
@@ -813,7 +859,7 @@ const HospitalDashboard = () => {
                                         return (
                                             <button
                                                 key={group}
-                                                onClick={() => handleTabChange('stock')}
+                                                onClick={() => { handleTabChange('stock'); setSelectedStockGroup(group); }}
                                                 className={`rounded-lg p-4 border-2 text-center shadow hover:shadow-md transition cursor-pointer ${isEmpty ? 'bg-red-50 border-red-300' : isLow ? 'bg-orange-50 border-orange-300' : 'bg-green-50 border-green-300'
                                                     }`}
                                             >
@@ -939,13 +985,22 @@ const HospitalDashboard = () => {
                         <div>
                             <div className="flex items-center justify-between mb-4">
                                 <h2 className="text-xl font-bold text-gray-800">Blood Requests</h2>
-                                <button
-                                    onClick={() => setShowRequestModal(true)}
-                                    className="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center gap-2 shadow-md hover:shadow-lg transition"
-                                >
-                                    <i className="fa fa-hand-holding-medical"></i>
-                                    Request Blood
-                                </button>
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={() => setShowWalkinModal(true)}
+                                        className="px-6 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-600 flex items-center gap-2 shadow-md hover:shadow-lg transition"
+                                    >
+                                        <i className="fa fa-user-plus"></i>
+                                        Walk-in Donation
+                                    </button>
+                                    <button
+                                        onClick={() => setShowRequestModal(true)}
+                                        className="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center gap-2 shadow-md hover:shadow-lg transition"
+                                    >
+                                        <i className="fa fa-hand-holding-medical"></i>
+                                        Request Blood
+                                    </button>
+                                </div>
                             </div>
                             <div className="bg-white rounded-xl shadow-lg overflow-hidden">
                                 <table className="w-full">
@@ -962,66 +1017,95 @@ const HospitalDashboard = () => {
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {allRequests.map((request) => {
-                                            const expiryDate = new Date(request.expiryDate);
-                                            const now = new Date();
-                                            const daysToExpiry = Math.ceil((expiryDate - now) / (1000 * 60 * 60 * 24));
-                                            const isExpired = expiryDate < now;
-                                            const isExpiringSoon = !isExpired && daysToExpiry <= 5;
+                                        {(() => {
+                                            // Only genuine blood requests this hospital sent to an
+                                            // organisation belong here — NOT blood usage/dispensing
+                                            // records (those live in Blood Stock / All Records instead).
+                                            const transferRows = transfers
+                                                .filter(t => t.initiatedBy !== 'organisation')
+                                                .map(t => ({
+                                                    _id: t._id,
+                                                    _kind: 'transfer',
+                                                    transactionId: t.transferId,
+                                                    bloodGroup: t.items.map(i => i.bloodGroup).join(', '),
+                                                    quantity: t.items.reduce((s, i) => s + i.quantity, 0),
+                                                    organisationName: t.organisation?.organisationName,
+                                                    expiryDate: null,
+                                                    createdAt: t.createdAt,
+                                                    status: t.status === 'hospital_approved' || t.status === 'admin_approved' ? 'completed'
+                                                        : t.status === 'org_rejected' ? 'rejected'
+                                                            : t.status === 'org_approved' ? 'awaiting your confirmation'
+                                                                : 'pending'
+                                                }));
+                                            const combined = transferRows
+                                                .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
-                                            return (
-                                                <tr key={request._id} className="border-b hover:bg-gray-50">
-                                                    <td className="p-3 text-xs font-mono text-blue-600">
-                                                        {request.transactionId?.slice(-8)}
-                                                    </td>
-                                                    <td className="p-3">
-                                                        <span className="px-3 py-1 bg-red-100 text-red-700 rounded-full font-bold">
-                                                            {request.bloodGroup}
-                                                        </span>
-                                                    </td>
-                                                    <td className="p-3 font-semibold">{request.quantity} units</td>
-                                                    <td className="p-3 text-sm">
-                                                        {request.organisation?.organisationName || request.organisationNameText || 'N/A'}
-                                                    </td>
-                                                    <td className="p-3">
-                                                        <div className="text-sm">
-                                                            <span className={isExpired ? 'text-red-600 font-bold' : isExpiringSoon ? 'text-orange-600 font-semibold' : 'text-gray-700'}>
-                                                                {expiryDate.toLocaleDateString()}
+                                            if (combined.length === 0) {
+                                                return (
+                                                    <tr>
+                                                        <td colSpan="8" className="p-8 text-center text-gray-500">
+                                                            <i className="fa fa-inbox text-4xl mb-3 text-gray-300"></i>
+                                                            <p>No blood requests yet</p>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            }
+
+                                            return combined.map((request) => {
+                                                const expiryDate = request.expiryDate ? new Date(request.expiryDate) : null;
+                                                const now = new Date();
+                                                const daysToExpiry = expiryDate ? Math.ceil((expiryDate - now) / (1000 * 60 * 60 * 24)) : null;
+                                                const isExpired = expiryDate ? expiryDate < now : false;
+                                                const isExpiringSoon = !isExpired && daysToExpiry !== null && daysToExpiry <= 5;
+
+                                                return (
+                                                    <tr key={request._id} className="border-b hover:bg-gray-50">
+                                                        <td className="p-3 text-xs font-mono text-blue-600">
+                                                            {request._kind === 'transfer' ? request.transactionId : request.transactionId?.slice(-8)}
+                                                        </td>
+                                                        <td className="p-3">
+                                                            <span className="px-3 py-1 bg-red-100 text-red-700 rounded-full font-bold">
+                                                                {request.bloodGroup}
                                                             </span>
-                                                            {isExpired && (
-                                                                <div className="text-xs text-red-600 font-semibold">EXPIRED</div>
+                                                        </td>
+                                                        <td className="p-3 font-semibold">{request.quantity} units</td>
+                                                        <td className="p-3 text-sm">
+                                                            {request._kind === 'transfer'
+                                                                ? (request.organisationName || 'N/A')
+                                                                : (request.organisation?.organisationName || request.organisationNameText || 'N/A')}
+                                                        </td>
+                                                        <td className="p-3">
+                                                            {expiryDate ? (
+                                                                <div className="text-sm">
+                                                                    <span className={isExpired ? 'text-red-600 font-bold' : isExpiringSoon ? 'text-orange-600 font-semibold' : 'text-gray-700'}>
+                                                                        {expiryDate.toLocaleDateString()}
+                                                                    </span>
+                                                                    {isExpired && <div className="text-xs text-red-600 font-semibold">EXPIRED</div>}
+                                                                    {isExpiringSoon && !isExpired && <div className="text-xs text-orange-600 font-semibold">{daysToExpiry} days left</div>}
+                                                                </div>
+                                                            ) : <span className="text-gray-400 text-sm">—</span>}
+                                                        </td>
+                                                        <td className="p-3 text-sm">{new Date(request.createdAt).toLocaleDateString()}</td>
+                                                        <td className="p-3">
+                                                            <span className={`px-2 py-1 rounded text-xs font-semibold ${request.status === 'completed' || request.status === 'approved' ? 'bg-green-100 text-green-700' : request.status === 'pending' ? 'bg-yellow-100 text-yellow-700' : request.status === 'rejected' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'}`}>
+                                                                {request.status?.toUpperCase() || 'PENDING'}
+                                                            </span>
+                                                        </td>
+                                                        <td className="p-3">
+                                                            {request._kind === 'usage' && (
+                                                                <button
+                                                                    onClick={() => handleEdit(request)}
+                                                                    className="text-blue-600 hover:text-blue-800 mr-2"
+                                                                    title="Edit"
+                                                                >
+                                                                    <i className="fa fa-edit"></i>
+                                                                </button>
                                                             )}
-                                                            {isExpiringSoon && !isExpired && (
-                                                                <div className="text-xs text-orange-600 font-semibold">{daysToExpiry} days left</div>
-                                                            )}
-                                                        </div>
-                                                    </td>
-                                                    <td className="p-3 text-sm">{new Date(request.createdAt).toLocaleDateString()}</td>
-                                                    <td className="p-3">
-                                                        <span className={`px-2 py-1 rounded text-xs font-semibold ${request.status === 'completed' || request.status === 'approved' ? 'bg-green-100 text-green-700' : request.status === 'pending' ? 'bg-yellow-100 text-yellow-700' : request.status === 'rejected' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'}`}>
-                                                            {request.status?.toUpperCase() || 'PENDING'}
-                                                        </span>
-                                                    </td>
-                                                    <td className="p-3">
-                                                        <button
-                                                            onClick={() => handleEdit(request)}
-                                                            className="text-blue-600 hover:text-blue-800 mr-2"
-                                                            title="Edit"
-                                                        >
-                                                            <i className="fa fa-edit"></i>
-                                                        </button>
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })}
-                                        {allRequests.length === 0 && (
-                                            <tr>
-                                                <td colSpan="8" className="p-8 text-center text-gray-500">
-                                                    <i className="fa fa-inbox text-4xl mb-3 text-gray-300"></i>
-                                                    <p>No blood requests yet</p>
-                                                </td>
-                                            </tr>
-                                        )}
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            });
+                                        })()}
                                     </tbody>
                                 </table>
                             </div>
@@ -1035,38 +1119,63 @@ const HospitalDashboard = () => {
                                 <h2 className="text-xl font-bold text-gray-800">Blood Stock (Real-time)</h2>
                             </div>
 
-                            <div className="grid grid-cols-1 gap-6">
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                                 {Object.entries(bloodStock).map(([group, data]) => {
                                     const status = getStockStatus(data.total);
-
                                     return (
-                                        <div key={group} className={`bg-white rounded-xl shadow-lg p-6 ${data.total === 0 ? 'border-2 border-red-500' : data.total < 10 ? 'border-2 border-orange-500' : ''}`}>
-                                            <div className="flex items-center justify-between mb-4">
-                                                <div className="flex items-center gap-4">
-                                                    <div className={`w-16 h-16 ${data.total === 0 ? 'bg-red-200' : 'bg-red-100'} rounded-full flex items-center justify-center`}>
-                                                        <span className="text-2xl font-bold text-red-600">{group}</span>
-                                                    </div>
-                                                    <div>
-                                                        <h3 className="text-3xl font-bold text-gray-800">{data.total} units</h3>
-                                                        <span className={`text-sm font-semibold ${status.color}`}>{status.text}</span>
-                                                        {data.total === 0 && (
-                                                            <div className="text-xs text-red-600 font-bold mt-1">⚠️ URGENT: Restock needed!</div>
-                                                        )}
-                                                    </div>
-                                                </div>
+                                        <button
+                                            key={group}
+                                            onClick={() => setSelectedStockGroup(group)}
+                                            className={`text-left bg-white rounded-xl shadow p-4 hover:shadow-md transition border-2 ${data.total === 0 ? 'border-red-400' : data.total < 10 ? 'border-orange-300' : 'border-transparent'}`}
+                                        >
+                                            <div className="flex items-center justify-between mb-2">
+                                                <span className="text-xl font-bold text-red-600">{group}</span>
                                                 {data.expiring > 0 && (
-                                                    <div className="bg-orange-100 px-4 py-2 rounded-lg">
-                                                        <p className="text-sm font-semibold text-orange-700">
-                                                            ⚠️ {data.expiring} units expiring soon
-                                                        </p>
-                                                    </div>
+                                                    <span className="text-xs bg-orange-100 text-orange-700 font-semibold px-2 py-0.5 rounded-full">
+                                                        {data.expiring} expiring
+                                                    </span>
                                                 )}
                                             </div>
+                                            <div className="text-2xl font-bold text-gray-800">{data.total}</div>
+                                            <div className="text-xs text-gray-500 mb-1">units</div>
+                                            <span className={`text-xs font-semibold ${status.color}`}>{status.text}</span>
+                                            <p className="text-xs text-gray-400 mt-2">Click for details ({data.items.length} record{data.items.length !== 1 ? 's' : ''})</p>
+                                        </button>
+                                    );
+                                })}
+                            </div>
 
-                                            {data.items.length > 0 && (
-                                                <div className="border-t pt-4">
-                                                    <h4 className="text-sm font-semibold text-gray-700 mb-2">Inventory Details:</h4>
-                                                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                            {/* Per-group breakdown modal */}
+                            {selectedStockGroup && (() => {
+                                const data = bloodStock[selectedStockGroup] || { total: 0, expiring: 0, items: [] };
+                                const status = getStockStatus(data.total);
+                                return (
+                                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setSelectedStockGroup(null)}>
+                                        <div className="bg-white rounded-xl w-full max-w-lg max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
+                                            <div className="bg-red-600 text-white px-6 py-4 rounded-t-xl flex items-center justify-between">
+                                                <h2 className="font-bold text-lg">{selectedStockGroup} — Stock Details</h2>
+                                                <button onClick={() => setSelectedStockGroup(null)} className="hover:opacity-70">
+                                                    <i className="fa fa-times text-xl"></i>
+                                                </button>
+                                            </div>
+                                            <div className="p-6 border-b">
+                                                <div className="flex items-center justify-between">
+                                                    <div>
+                                                        <div className="text-3xl font-bold text-gray-800">{data.total} units</div>
+                                                        <span className={`text-sm font-semibold ${status.color}`}>{status.text}</span>
+                                                    </div>
+                                                    {data.expiring > 0 && (
+                                                        <div className="bg-orange-100 px-4 py-2 rounded-lg">
+                                                            <p className="text-sm font-semibold text-orange-700">⚠️ {data.expiring} units expiring soon</p>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <div className="overflow-y-auto p-6">
+                                                {data.items.length === 0 ? (
+                                                    <p className="text-center text-gray-400 py-8">No records for this group</p>
+                                                ) : (
+                                                    <div className="space-y-2">
                                                         {data.items.map((item) => (
                                                             <div key={item.id} className={`flex items-center justify-between p-3 rounded-lg ${item.isExpiringSoon ? 'bg-orange-50 border border-orange-200' : 'bg-gray-50'}`}>
                                                                 <div className="flex items-center gap-3">
@@ -1076,22 +1185,28 @@ const HospitalDashboard = () => {
                                                                     <span className="font-semibold">{item.quantity} units</span>
                                                                 </div>
                                                                 <div className="text-right">
-                                                                    <p className={`text-sm font-semibold ${item.isExpiringSoon ? 'text-orange-600' : 'text-gray-600'}`}>
-                                                                        Expires: {new Date(item.expiryDate).toLocaleDateString()}
-                                                                    </p>
+                                                                    {item.type === 'in' ? (
+                                                                        <p className={`text-sm font-semibold ${item.isExpiringSoon ? 'text-orange-600' : 'text-gray-600'}`}>
+                                                                            Expires: {new Date(item.expiryDate).toLocaleDateString()}
+                                                                        </p>
+                                                                    ) : (
+                                                                        <p className="text-sm font-semibold text-gray-600">
+                                                                            Used / Sent
+                                                                        </p>
+                                                                    )}
                                                                     <p className="text-xs text-gray-500">
-                                                                        Added: {new Date(item.createdAt).toLocaleDateString()}
+                                                                        {item.type === 'in' ? 'Added' : 'Date'}: {new Date(item.createdAt).toLocaleDateString()}
                                                                     </p>
                                                                 </div>
                                                             </div>
                                                         ))}
                                                     </div>
-                                                </div>
-                                            )}
+                                                )}
+                                            </div>
                                         </div>
-                                    );
-                                })}
-                            </div>
+                                    </div>
+                                );
+                            })()}
                         </div>
                     )}
 
@@ -1446,7 +1561,7 @@ const HospitalDashboard = () => {
                                                 value={passwordForm.newPassword}
                                                 onChange={handlePasswordChange}
                                                 required
-                                                minLength={6}
+                                                minLength={8}
                                                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none"
                                             />
                                         </div>
@@ -1458,7 +1573,7 @@ const HospitalDashboard = () => {
                                                 value={passwordForm.confirmNewPassword}
                                                 onChange={handlePasswordChange}
                                                 required
-                                                minLength={6}
+                                                minLength={8}
                                                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none"
                                             />
                                         </div>
@@ -1653,6 +1768,7 @@ const HospitalDashboard = () => {
                         </div>
                     )}
 
+
                     {/* Add Manual Record Modal — hospital credits their own stock */}
                     {showManualAddModal && (
                         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -1755,6 +1871,109 @@ const HospitalDashboard = () => {
                         onSuccess={() => { fetchInventory(); fetchTransfers(); }}
                         inventoryRecord={selectedInventory}
                     />
+
+                    {/* Walk-in Donation Modal — hospital credits their own stock from an unregistered donor */}
+                    {showWalkinModal && (
+                        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                            <div className="bg-white rounded-xl w-full max-w-md">
+                                <div className="bg-purple-600 text-white px-6 py-4 rounded-t-xl flex items-center justify-between">
+                                    <h2 className="font-bold flex items-center gap-2"><i className="fa fa-user-plus"></i> Walk-in / Unregistered Donation</h2>
+                                    <button onClick={() => setShowWalkinModal(false)}><i className="fa fa-times text-xl"></i></button>
+                                </div>
+                                <div className="p-6 space-y-4">
+                                    <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 text-xs text-purple-800">
+                                        <i className="fa fa-info-circle mr-1"></i> For donors who are <strong>not registered</strong> in the system. This will be added to your own stock right away.
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-semibold text-gray-700 mb-1">Donor Name *</label>
+                                        <input value={walkinForm.donorName} onChange={e => setWalkinForm({ ...walkinForm, donorName: e.target.value })}
+                                            placeholder="Full name of donor"
+                                            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 outline-none" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-semibold text-gray-700 mb-1">Mobile Number</label>
+                                        <input value={walkinForm.donorPhone}
+                                            onChange={e => setWalkinForm({ ...walkinForm, donorPhone: e.target.value.replace(/\D/g, '').slice(0, 10) })}
+                                            placeholder="10-digit mobile number"
+                                            inputMode="numeric"
+                                            maxLength={10}
+                                            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 outline-none" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-semibold text-gray-700 mb-1">Camp / Source Name</label>
+                                        <input value={walkinForm.campName} onChange={e => setWalkinForm({ ...walkinForm, campName: e.target.value })}
+                                            placeholder="e.g. In-hospital blood drive, Walk-in..."
+                                            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 outline-none" />
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="block text-sm font-semibold text-gray-700 mb-1">Blood Group *</label>
+                                            <select value={walkinForm.bloodGroup} onChange={e => setWalkinForm({ ...walkinForm, bloodGroup: e.target.value })}
+                                                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 outline-none">
+                                                <option value="">Select</option>
+                                                {['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'].map(g => <option key={g}>{g}</option>)}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-semibold text-gray-700 mb-1">Units *</label>
+                                            <input type="number" value={walkinForm.quantity} onChange={e => setWalkinForm({ ...walkinForm, quantity: e.target.value })}
+                                                placeholder="e.g. 1" min="1"
+                                                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 outline-none" />
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-semibold text-gray-700 mb-1">Expiry Date *</label>
+                                        <input type="date" value={walkinForm.expiryDate} onChange={e => setWalkinForm({ ...walkinForm, expiryDate: e.target.value })}
+                                            min={new Date().toISOString().split('T')[0]}
+                                            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 outline-none" />
+                                    </div>
+                                    <div className="flex gap-3 pt-2">
+                                        <button disabled={walkinSaving} onClick={async () => {
+                                            if (!walkinForm.donorName || !walkinForm.bloodGroup || !walkinForm.quantity || !walkinForm.expiryDate) {
+                                                alert('Please fill all required fields'); return;
+                                            }
+                                            if (walkinForm.donorPhone && walkinForm.donorPhone.length !== 10) {
+                                                alert('Mobile number must be exactly 10 digits'); return;
+                                            }
+                                            setWalkinSaving(true);
+                                            try {
+                                                const noteParts = [];
+                                                if (walkinForm.campName) noteParts.push(walkinForm.campName);
+                                                if (walkinForm.donorPhone) noteParts.push(`Phone: ${walkinForm.donorPhone}`);
+                                                const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:7000'}/api/inventory/create-inventory`, {
+                                                    method: 'POST', credentials: 'include',
+                                                    headers: { 'Content-Type': 'application/json' },
+                                                    body: JSON.stringify({
+                                                        inventoryType: 'in',
+                                                        bloodGroup: walkinForm.bloodGroup,
+                                                        quantity: parseInt(walkinForm.quantity),
+                                                        expiryDate: walkinForm.expiryDate,
+                                                        hospital: user?.email,
+                                                        source_name: walkinForm.donorName,
+                                                        notes: noteParts.length ? noteParts.join(' — ') : 'Walk-in donation',
+                                                        isManualEntry: false,
+                                                        verified: false,
+                                                        walkinDonor: true
+                                                    })
+                                                });
+                                                const data = await res.json();
+                                                if (data.success) {
+                                                    alert('✅ Walk-in donation recorded! Added to your blood stock.');
+                                                    setShowWalkinModal(false);
+                                                    setWalkinForm({ donorName: '', donorPhone: '', campName: '', bloodGroup: '', quantity: '', expiryDate: '' });
+                                                    fetchInventory();
+                                                } else alert(data.message || 'Failed');
+                                            } catch (_) { alert('Error occurred'); }
+                                            setWalkinSaving(false);
+                                        }} className="flex-1 bg-purple-600 text-white py-2.5 rounded-lg font-semibold hover:bg-purple-700 disabled:opacity-50 text-sm">
+                                            {walkinSaving ? 'Saving...' : 'Record Walk-in Donation'}
+                                        </button>
+                                        <button onClick={() => setShowWalkinModal(false)} className="flex-1 bg-gray-200 text-gray-700 py-2.5 rounded-lg font-semibold hover:bg-gray-300 text-sm">Cancel</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
                     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
                 </main>

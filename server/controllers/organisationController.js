@@ -53,7 +53,7 @@ export const getOrganisationBloodStock = async (req, res) => {
             expiryDate: { $gt: new Date() },
             $or: [
                 { inventoryType: 'out' },
-                { inventoryType: 'in', target_type: { $ne: 'hospital' } }
+                { inventoryType: 'in', hospital: null }
             ]
         })
             .populate('donor').populate('hospital');

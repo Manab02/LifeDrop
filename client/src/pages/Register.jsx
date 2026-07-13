@@ -77,8 +77,19 @@ const Register = () => {
       return;
     }
 
-    if (formData.password.length < 6) {
-      Swal.fire('Error', 'Password must be at least 6 characters long!', 'error');
+    if (formData.password.length < 8) {
+      Swal.fire('Error', 'Password must be at least 8 characters long!', 'error');
+      return;
+    }
+
+    const strongPasswordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).+$/;
+    if (!strongPasswordRegex.test(formData.password)) {
+      Swal.fire('Error', 'Password must include an uppercase letter, a lowercase letter, a number, and a symbol!', 'error');
+      return;
+    }
+
+    if (formData.phone && !/^\d{10}$/.test(formData.phone)) {
+      Swal.fire('Error', 'Phone number must be exactly 10 digits!', 'error');
       return;
     }
 
@@ -257,10 +268,13 @@ const Register = () => {
                 type="tel"
                 name="phone"
                 value={formData.phone}
-                onChange={handleChange}
+                onChange={(e) => handleChange({ target: { name: 'phone', value: e.target.value.replace(/\D/g, '').slice(0, 10) } })}
                 required
-                placeholder="+91 1234567890"
-                pattern="[0-9]{10,15}"
+                placeholder="10-digit mobile number"
+                inputMode="numeric"
+                maxLength={10}
+                pattern="\d{10}"
+                title="Phone number must be exactly 10 digits"
                 className="w-full px-4 py-3 border border-gray-300 rounded focus:ring-2 focus:ring-red-500"
               />
             </div>
@@ -276,9 +290,13 @@ const Register = () => {
                 value={formData.password}
                 onChange={handleChange}
                 required
-                placeholder="Min 6 characters"
+                minLength={8}
+                pattern="^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$"
+                title="At least 8 characters, with uppercase, lowercase, a number, and a symbol"
+                placeholder="Min 8 chars, incl. A-Z, a-z, 0-9, symbol"
                 className="w-full px-4 py-3 border border-gray-300 rounded focus:ring-2 focus:ring-red-500 pr-10"
               />
+              <p className="text-xs text-gray-500 mt-1">Must include uppercase, lowercase, a number, and a symbol.</p>
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}

@@ -10,7 +10,7 @@ const getOrgStock = async (orgId) => {
         expiryDate: { $gt: new Date() },
         $or: [
             { inventoryType: 'out' },
-            { inventoryType: 'in', target_type: { $ne: 'hospital' } }
+            { inventoryType: 'in', hospital: null }
         ]
     });
     const stock = {};
@@ -456,7 +456,7 @@ export const getAllPendingTransfers = async (req, res) => {
             return res.json({ success: false, message: 'Admin only' });
 
         const transfers = await transferModel.find({
-            status: { $in: ['requested', 'org_rejected', 'hospital_rejected'] }
+            status: 'requested'
         })
             .populate('organisation', 'organisationName email')
             .populate('hospital', 'hospitalName email')
