@@ -119,12 +119,15 @@ export const register = async (req, res) => {
 
         res.cookie('token', token, {
             httpOnly: true,
-            secure: true,       
-            sameSite: 'none',    
+            secure: true,
+            sameSite: 'none',
             maxAge: 24 * 60 * 60 * 1000
         });
 
         console.log('Attempting to send email...');
+        let emailSent = false;
+        let emailErrorMessage = null;
+
         try {
             let emailContent = `
                 <h2>Welcome to Life Drop!</h2>
@@ -160,9 +163,11 @@ export const register = async (req, res) => {
             };
 
             await transporter.sendMail(mailOptions);
+            emailSent = true;
             console.log('Email sent');
         } catch (emailError) {
-            console.log('Email send failed (non-critical):', emailError.message);
+            console.error('Email send failed (non-critical):', emailError);
+            emailErrorMessage = emailError.message;
         }
 
         console.log('Registration successful!');
@@ -171,6 +176,8 @@ export const register = async (req, res) => {
             message: role === 'donor'
                 ? 'Registration successful!'
                 : 'Registration submitted! Waiting for admin approval.',
+            emailSent,
+            emailError: emailErrorMessage,
             user: {
                 id: user._id,
                 email: user.email,
